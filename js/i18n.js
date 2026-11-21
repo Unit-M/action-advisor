@@ -1,0 +1,284 @@
+// Traductions de l'interface : français, anglais, persan (persan = écriture de droite à gauche).
+// t("clé", {param}) renvoie le texte dans la langue choisie (Réglages → Langue).
+import { getState } from "./store.js";
+
+export const LANGS = [
+  { id: "fr", label: "Français", locale: "fr-FR", dir: "ltr", aiName: "français" },
+  { id: "en", label: "English", locale: "en-US", dir: "ltr", aiName: "English" },
+  { id: "fa", label: "فارسی", locale: "fa-IR", dir: "rtl", aiName: "Persian (فارسی)" },
+];
+
+const D = {
+  // ---- général ----
+  now: ["à l'instant", "just now", "همین الان"],
+  agoMin: ["il y a {n} min", "{n} min ago", "{n} دقیقه پیش"],
+  agoH: ["il y a {n} h", "{n} h ago", "{n} ساعت پیش"],
+  agoD: ["il y a {n} j", "{n} d ago", "{n} روز پیش"],
+  close: ["Fermer", "Close", "بستن"],
+  save: ["Enregistrer", "Save", "ذخیره"],
+  loading: ["Chargement…", "Loading…", "در حال بارگذاری…"],
+  retry: ["Réessayer", "Retry", "تلاش دوباره"],
+  none: ["Aucune", "None", "هیچ"],
+
+  // ---- navigation / en-tête ----
+  navPortfolio: ["Portefeuille", "Portfolio", "سبد سهام"],
+  navSignals: ["Signaux", "Signals", "سیگنال‌ها"],
+  navNews: ["Actus", "News", "اخبار"],
+  navSettings: ["Réglages", "Settings", "تنظیمات"],
+  refresh: ["Actualiser", "Refresh", "به‌روزرسانی"],
+  add: ["Ajouter", "Add", "افزودن"],
+  totalValue: ["Valeur totale", "Total value", "ارزش کل"],
+  unrealized: ["Plus-value latente", "Unrealized gain", "سود/زیان باز"],
+  cash: ["Liquidités", "Cash", "نقدینگی"],
+  updating: ["Mise à jour {done}/{total}…", "Updating {done}/{total}…", "به‌روزرسانی {done}/{total}…"],
+  updatingShort: ["Mise à jour…", "Updating…", "در حال به‌روزرسانی…"],
+  refreshedAgo: ["Actualisé {ago}", "Updated {ago}", "به‌روزشده {ago}"],
+  neverRefreshed: ["Jamais actualisé", "Never updated", "هنوز به‌روز نشده"],
+  fxMissing: ["taux de change manquant", "exchange rate missing", "نرخ ارز موجود نیست"],
+  configureSource: ["Configurez la source des cours dans Réglages", "Set up the price source in Settings", "منبع قیمت‌ها را در تنظیمات مشخص کنید"],
+  dataUpToDate: ["Données à jour", "Data up to date", "داده‌ها به‌روز شد"],
+
+  // ---- portefeuille ----
+  noStock: ["Aucune action", "No stocks yet", "هنوز سهمی اضافه نشده"],
+  tapPlus: ["Appuyez sur <b>+</b> pour ajouter un achat ou une action à surveiller.", "Tap <b>+</b> to add a purchase or a stock to watch.", "برای افزودن خرید یا سهمی برای دیده‌بانی، <b>+</b> را بزنید."],
+  startSettings: ["Commencez par configurer la source des cours dans <a href=\"#\" data-tab=\"settings\">Réglages</a>.", "Start by setting up the price source in <a href=\"#\" data-tab=\"settings\">Settings</a>.", "ابتدا منبع قیمت‌ها را در <a href=\"#\" data-tab=\"settings\">تنظیمات</a> مشخص کنید."],
+  avgCost: ["PRU", "Avg cost", "میانگین خرید"],
+  oneMonth: ["1 mois", "1 month", "۱ ماه"],
+  oneYear: ["1 an", "1 year", "۱ سال"],
+  pricesNotLoaded: ["Cours pas encore chargés", "Prices not loaded yet", "قیمت‌ها هنوز بارگذاری نشده"],
+  myPositions: ["Mes positions", "My positions", "سهام من"],
+  watchlist: ["Surveillance", "Watchlist", "دیده‌بان"],
+  noPositionYet: ["Aucune position achetée pour l'instant.", "No positions bought yet.", "هنوز سهمی نخریده‌اید."],
+
+  // ---- signaux ----
+  nothingToAnalyze: ["Rien à analyser pour l'instant.", "Nothing to analyze yet.", "فعلاً چیزی برای تحلیل نیست."],
+  aiPortfolioBtn: ["✦ Bilan IA du portefeuille", "✦ AI portfolio review", "✦ بررسی سبد با هوش مصنوعی"],
+  score: ["Score", "Score", "امتیاز"],
+  stop: ["Stop", "Stop", "حد ضرر"],
+  target: ["Objectif", "Target", "هدف قیمتی"],
+  buyZone: ["Zone d'achat", "Buy zone", "محدوده خرید"],
+  disclaimer: [
+    "Signaux calculés automatiquement à partir de règles techniques et des titres d'actualité. Ce ne sont pas des conseils en investissement : vous restez seul décideur.",
+    "Signals are computed automatically from technical rules and news headlines. They are not investment advice: you remain the sole decision-maker.",
+    "سیگنال‌ها به‌طور خودکار از قواعد تکنیکال و تیتر اخبار محاسبه می‌شوند. این‌ها توصیهٔ سرمایه‌گذاری نیستند و تصمیم نهایی با شماست.",
+  ],
+
+  // ---- actus ----
+  noNews: ["Pas encore d'actualités. Appuyez sur ↻ pour actualiser.", "No news yet. Tap ↻ to refresh.", "هنوز خبری نیست. برای به‌روزرسانی ↻ را بزنید."],
+
+  // ---- actions (badges) ----
+  act_SELL_ALL: ["Vendre tout", "Sell all", "فروش کامل"],
+  act_SELL_PART: ["Alléger", "Trim", "فروش بخشی"],
+  act_HOLD: ["Conserver", "Hold", "نگه‌داری"],
+  act_WAIT: ["Attendre", "Wait", "صبر"],
+  act_BUY_MORE: ["Renforcer", "Buy more", "خرید بیشتر"],
+  act_BUY: ["Acheter", "Buy", "خرید"],
+  shares: ["{n} titre(s)", "{n} share(s)", "{n} سهم"],
+
+  // ---- raisons du moteur de règles ----
+  r_above200: ["Cours au-dessus de la moyenne 200 j (tendance de fond haussière)", "Price above the 200-day average (long-term uptrend)", "قیمت بالای میانگین ۲۰۰ روزه (روند بلندمدت صعودی)"],
+  r_below200: ["Cours sous la moyenne 200 j (tendance de fond baissière)", "Price below the 200-day average (long-term downtrend)", "قیمت زیر میانگین ۲۰۰ روزه (روند بلندمدت نزولی)"],
+  r_goldenIn: ["MM50 > MM200 (croisement haussier en place)", "MA50 > MA200 (bullish crossover in place)", "میانگین ۵۰ بالای ۲۰۰ (تقاطع صعودی برقرار است)"],
+  r_deathIn: ["MM50 < MM200 (croisement baissier en place)", "MA50 < MA200 (bearish crossover in place)", "میانگین ۵۰ زیر ۲۰۰ (تقاطع نزولی برقرار است)"],
+  r_above50: ["Cours au-dessus de la MM50", "Price above the MA50", "قیمت بالای میانگین ۵۰ روزه"],
+  r_below50: ["Cours sous la MM50", "Price below the MA50", "قیمت زیر میانگین ۵۰ روزه"],
+  r_macdPos: ["MACD positif (momentum haussier)", "Positive MACD (upward momentum)", "MACD مثبت (شتاب صعودی)"],
+  r_macdNeg: ["MACD négatif (momentum baissier)", "Negative MACD (downward momentum)", "MACD منفی (شتاب نزولی)"],
+  r_macdUp: ["MACD vient de croiser à la hausse", "MACD just crossed upward", "MACD به‌تازگی رو به بالا قطع کرد"],
+  r_macdDown: ["MACD vient de croiser à la baisse", "MACD just crossed downward", "MACD به‌تازگی رو به پایین قطع کرد"],
+  r_rsiDip: ["RSI {rsi} : repli en survente dans une tendance haussière", "RSI {rsi}: oversold pullback within an uptrend", "RSI {rsi}: اصلاح در ناحیهٔ اشباع فروش در روند صعودی"],
+  r_rsiKnife: ["RSI {rsi} : survente, mais tendance baissière — ne pas se précipiter", "RSI {rsi}: oversold, but in a downtrend — don't rush", "RSI {rsi}: اشباع فروش، اما روند نزولی است — عجله نکنید"],
+  r_rsiStrongOb: ["RSI {rsi} : fort surachat", "RSI {rsi}: strongly overbought", "RSI {rsi}: اشباع خرید شدید"],
+  r_rsiOb: ["RSI {rsi} : surachat", "RSI {rsi}: overbought", "RSI {rsi}: اشباع خرید"],
+  r_belowBB: ["Sous la bande de Bollinger basse", "Below the lower Bollinger band", "زیر باند پایینی بولینگر"],
+  r_aboveBB: ["Au-dessus de la bande de Bollinger haute", "Above the upper Bollinger band", "بالای باند بالایی بولینگر"],
+  r_nearHigh: ["Proche du plus haut 52 semaines (force relative)", "Near the 52-week high (relative strength)", "نزدیک سقف ۵۲ هفته (قدرت نسبی)"],
+  r_newsPos: ["Actualités plutôt positives ({pos}+ / {neg}− sur {count})", "Mostly positive news ({pos}+ / {neg}− of {count})", "اخبار عمدتاً مثبت ({pos}+ / {neg}− از {count})"],
+  r_newsNeg: ["Actualités plutôt négatives ({pos}+ / {neg}− sur {count})", "Mostly negative news ({pos}+ / {neg}− of {count})", "اخبار عمدتاً منفی ({pos}+ / {neg}− از {count})"],
+  k_stopHit: ["Stop suiveur touché ({stop}) : protéger le capital", "Trailing stop hit ({stop}): protect your capital", "حد ضرر متحرک ({stop}) فعال شد: از سرمایه محافظت کنید"],
+  k_overweight: ["Ligne trop lourde ({w} % du portefeuille > {max} %)", "Position too large ({w}% of portfolio > {max}%)", "سهم بیش از حد سنگین است ({w}٪ از سبد > {max}٪)"],
+  k_takeProfit: ["+{g} % et surachat : prendre une partie des bénéfices", "+{g}% and overbought: take some profits", "+{g}٪ و اشباع خرید: بخشی از سود را برداشت کنید"],
+  k_negSignals: ["Signaux nettement négatifs (score {score})", "Clearly negative signals (score {score})", "سیگنال‌های آشکارا منفی (امتیاز {score})"],
+  k_posRoom: ["Signaux positifs (score {score}) et place pour renforcer", "Positive signals (score {score}) and room to add", "سیگنال‌های مثبت (امتیاز {score}) و جا برای خرید بیشتر"],
+  k_posFull: ["Signaux positifs (score {score}) — poids cible atteint ou pas assez de liquidités", "Positive signals (score {score}) — target weight reached or not enough cash", "سیگنال‌های مثبت (امتیاز {score}) — وزن هدف پر شده یا نقدینگی کافی نیست"],
+  k_hold: ["Pas de signal fort : conserver, surveiller le stop", "No strong signal: hold and watch the stop", "سیگنال قوی وجود ندارد: نگه دارید و حد ضرر را زیر نظر بگیرید"],
+  k_buy: ["Signaux positifs (score {score})", "Positive signals (score {score})", "سیگنال‌های مثبت (امتیاز {score})"],
+  k_buyNoCash: ["Signaux positifs (score {score}) mais pas assez de liquidités renseignées", "Positive signals (score {score}) but not enough cash entered", "سیگنال‌های مثبت (امتیاز {score}) اما نقدینگی ثبت‌شده کافی نیست"],
+  k_neutralZone: ["Neutre — zone d'achat intéressante vers {zone}", "Neutral — attractive buy zone around {zone}", "خنثی — محدودهٔ خرید مناسب حدود {zone}"],
+  k_avoid: ["Signaux négatifs : éviter pour l'instant", "Negative signals: avoid for now", "سیگنال‌های منفی: فعلاً دوری کنید"],
+  k_noBuy: ["Pas de signal d'achat", "No buy signal", "سیگنال خرید وجود ندارد"],
+  k_shortHist: ["Historique trop court ({n} séances, 30 minimum)", "History too short ({n} sessions, 30 minimum)", "سابقه کوتاه است ({n} جلسه، حداقل ۳۰)"],
+  k_noPrices: ["Pas encore de cours : impossible de calculer un conseil", "No prices yet: cannot compute advice", "هنوز قیمتی نیست: محاسبهٔ توصیه ممکن نیست"],
+  al_below: ["Cours ≤ votre alerte basse ({v})", "Price ≤ your low alert ({v})", "قیمت ≤ هشدار پایین شما ({v})"],
+  al_above: ["Cours ≥ votre alerte haute ({v})", "Price ≥ your high alert ({v})", "قیمت ≥ هشدار بالای شما ({v})"],
+
+  // ---- fiche ----
+  pricesNotLoadedTitle: ["Cours non chargés.", "Prices not loaded.", "قیمت‌ها بارگذاری نشد."],
+  relayEmpty: [
+    "La source « Yahoo via relais » est choisie mais l'adresse du relais est vide. Renseignez-la dans Réglages, ou choisissez Twelve Data avec une clé gratuite (actions US seulement).",
+    "The \"Yahoo via relay\" source is selected but the relay address is empty. Fill it in Settings, or choose Twelve Data with a free key (US stocks only).",
+    "منبع «یاهو از طریق رله» انتخاب شده اما نشانی رله خالی است. آن را در تنظیمات وارد کنید، یا Twelve Data را با کلید رایگان انتخاب کنید (فقط سهام آمریکا).",
+  ],
+  tdKeyNeeded: ["Ajoutez votre clé Twelve Data gratuite dans Réglages.", "Add your free Twelve Data key in Settings.", "کلید رایگان Twelve Data را در تنظیمات وارد کنید."],
+  reason: ["Raison : {r}", "Reason: {r}", "علت: {r}"],
+  notTriedYet: ["pas encore tenté", "not tried yet", "هنوز امتحان نشده"],
+  quantity: ["Quantité", "Quantity", "تعداد"],
+  unrealizedShort: ["+/- latente", "Unrealized", "سود/زیان باز"],
+  adviceRules: ["Conseil (règles, sans IA)", "Advice (rules, no AI)", "توصیه (قواعد، بدون هوش مصنوعی)"],
+  aiOn: ["✦ Avis IA sur {s}", "✦ AI opinion on {s}", "✦ نظر هوش مصنوعی دربارهٔ {s}"],
+  indicators: ["Indicateurs", "Indicators", "شاخص‌ها"],
+  ma50: ["MM50", "MA50", "میانگین ۵۰"],
+  ma200: ["MM200", "MA200", "میانگین ۲۰۰"],
+  high52: ["Haut 52 s", "52-wk high", "سقف ۵۲ هفته"],
+  low52: ["Bas 52 s", "52-wk low", "کف ۵۲ هفته"],
+  volatility: ["Volatilité", "Volatility", "نوسان"],
+  newsShort: ["Actus", "News", "اخبار"],
+  priceAlerts: ["Alertes de prix", "Price alerts", "هشدار قیمت"],
+  ifBelow: ["Si ≤", "If ≤", "اگر ≤"],
+  ifAbove: ["Si ≥", "If ≥", "اگر ≥"],
+  news: ["Actualités", "News", "اخبار"],
+  transactions: ["Transactions", "Transactions", "معاملات"],
+  buyBtn: ["+ Achat", "+ Buy", "+ خرید"],
+  sellBtn: ["− Vente", "− Sell", "− فروش"],
+  unwatch: ["Ne plus surveiller", "Stop watching", "حذف از دیده‌بان"],
+  watch: ["Surveiller", "Watch", "دیده‌بانی"],
+  buy: ["Achat", "Buy", "خرید"],
+  sell: ["Vente", "Sell", "فروش"],
+  fees: ["frais", "fees", "کارمزد"],
+  delete: ["supprimer", "delete", "حذف"],
+  deleteTxConfirm: ["Supprimer cette transaction ?", "Delete this transaction?", "این معامله حذف شود؟"],
+  alertSaved: ["Alerte enregistrée", "Alert saved", "هشدار ذخیره شد"],
+  pricesLoaded: ["Cours chargés", "Prices loaded", "قیمت‌ها بارگذاری شد"],
+  chartLabel: ["Graphique des cours sur {n} séances", "Price chart over {n} sessions", "نمودار قیمت در {n} جلسه"],
+  legendPrice: ["Cours", "Price", "قیمت"],
+
+  // ---- IA ----
+  dec_ACHETER: ["Acheter", "Buy", "خرید"],
+  dec_RENFORCER: ["Renforcer", "Buy more", "خرید بیشتر"],
+  dec_CONSERVER: ["Conserver", "Hold", "نگه‌داری"],
+  dec_ALLEGER: ["Alléger", "Trim", "فروش بخشی"],
+  dec_VENDRE_TOUT: ["Vendre tout", "Sell all", "فروش کامل"],
+  dec_ATTENDRE: ["Attendre", "Wait", "صبر"],
+  confidence: ["confiance {n}/100", "confidence {n}/100", "اطمینان {n}/۱۰۰"],
+  agreesRules: ["d'accord avec les règles", "agrees with the rules", "هم‌نظر با قواعد"],
+  disagreesRules: ["diverge des règles", "disagrees with the rules", "مخالف قواعد"],
+  limitPrice: ["Prix limite", "Limit price", "قیمت محدود"],
+  keyPoints: ["Points clés", "Key points", "نکات کلیدی"],
+  risks: ["Risques", "Risks", "ریسک‌ها"],
+  cachedOpinion: ["Avis en cache ({ago}) · 0 token", "Cached opinion ({ago}) · 0 tokens", "نظر ذخیره‌شده ({ago}) · ۰ توکن"],
+  cached: ["En cache ({ago}) · 0 token", "Cached ({ago}) · 0 tokens", "ذخیره‌شده ({ago}) · ۰ توکن"],
+  tokens: ["{n} tokens", "{n} tokens", "{n} توکن"],
+  askAgain: ["redemander", "ask again", "پرسش دوباره"],
+  aiRunning: ["Analyse IA en cours…", "AI analysis in progress…", "تحلیل هوش مصنوعی در جریان است…"],
+  aiReviewRunning: ["Bilan IA en cours…", "AI review in progress…", "بررسی هوش مصنوعی در جریان است…"],
+  aiNoAnthropicKey: ["Ajoutez votre clé API Anthropic dans Réglages.", "Add your Anthropic API key in Settings.", "کلید API آنتروپیک را در تنظیمات وارد کنید."],
+  aiNoOpenaiKey: ["Ajoutez votre clé API OpenAI dans Réglages.", "Add your OpenAI API key in Settings.", "کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید."],
+  aiNoOpenaiModel: ["Choisissez un modèle OpenAI dans Réglages (bouton « Charger la liste »).", "Choose an OpenAI model in Settings (\"Load list\" button).", "یک مدل اوپن‌ای‌آی را در تنظیمات انتخاب کنید (دکمهٔ «بارگذاری فهرست»)."],
+  aiBudget: ["Budget IA du mois atteint ({n} tokens). Augmentez-le dans Réglages.", "Monthly AI budget reached ({n} tokens). Raise it in Settings.", "بودجهٔ ماهانهٔ هوش مصنوعی تمام شد ({n} توکن). آن را در تنظیمات افزایش دهید."],
+  aiRefused: ["L'IA a refusé de répondre à cette demande.", "The AI declined to answer this request.", "هوش مصنوعی از پاسخ به این درخواست خودداری کرد."],
+  aiTruncated: ["Réponse IA tronquée, réessayez.", "AI response cut off, please retry.", "پاسخ هوش مصنوعی ناقص ماند، دوباره تلاش کنید."],
+  aiUnreadable: ["Réponse IA illisible", "Unreadable AI response", "پاسخ هوش مصنوعی قابل خواندن نیست"],
+  aiBadKey: ["Clé API {p} invalide", "Invalid {p} API key", "کلید API {p} نامعتبر است"],
+  aiRateLimit: ["Trop de requêtes IA, réessayez dans une minute", "Too many AI requests, retry in a minute", "درخواست‌های زیاد، یک دقیقه دیگر دوباره تلاش کنید"],
+  aiNoCredit: ["{p} : quota ou crédit insuffisant ({m})", "{p}: quota or credit exhausted ({m})", "{p}: سهمیه یا اعتبار کافی نیست ({m})"],
+  aiError: ["Erreur IA {s} : {m}", "AI error {s}: {m}", "خطای هوش مصنوعی {s}: {m}"],
+
+  // ---- ajout / transaction ----
+  addStock: ["Ajouter une action", "Add a stock", "افزودن سهم"],
+  searchPh: ["Nom ou ticker (ex : LVMH, AAPL, Airbus)", "Name or ticker (e.g. Apple, NVDA, Airbus)", "نام یا نماد (مثلاً Apple، NVDA، Airbus)"],
+  searching: ["Recherche…", "Searching…", "در حال جستجو…"],
+  noResult: ["Aucun résultat pour « {q} ». Essayez le nom de la société (ex : Airbus) ou le ticker (ex : AIR, MC, TTE).", "No results for \"{q}\". Try the company name (e.g. Airbus) or the ticker (e.g. AIR, NVDA).", "نتیجه‌ای برای «{q}» نیست. نام شرکت (مثلاً Airbus) یا نماد آن (مثلاً NVDA) را امتحان کنید."],
+  iBought: ["J'ai acheté", "I bought it", "خریده‌ام"],
+  watchOnly: ["Surveiller seulement", "Watch only", "فقط دیده‌بانی"],
+  addedToWatch: ["{s} ajouté à la surveillance", "{s} added to the watchlist", "{s} به دیده‌بان اضافه شد"],
+  unitPrice: ["Prix unitaire ({c})", "Unit price ({c})", "قیمت هر سهم ({c})"],
+  feesLabel: ["Frais", "Fees", "کارمزد"],
+  date: ["Date", "Date", "تاریخ"],
+  updateCash: ["Mettre à jour mes liquidités", "Update my cash", "نقدینگی من به‌روز شود"],
+  qtyPriceRequired: ["Quantité et prix requis", "Quantity and price required", "تعداد و قیمت الزامی است"],
+  heldOnly: ["Vous ne déteniez que {n} titre(s) à cette date", "You only held {n} share(s) on that date", "در آن تاریخ فقط {n} سهم داشتید"],
+  txSaved: ["Transaction enregistrée", "Transaction saved", "معامله ذخیره شد"],
+
+  // ---- réglages ----
+  language: ["Langue", "Language", "زبان"],
+  money: ["Argent", "Money", "پول"],
+  availableCash: ["Liquidités disponibles", "Available cash", "نقدینگی موجود"],
+  baseCurrency: ["Devise de base", "Base currency", "ارز پایه"],
+  riskRules: ["Règles de risque (sans IA)", "Risk rules (no AI)", "قواعد ریسک (بدون هوش مصنوعی)"],
+  riskPerTrade: ["Risque max par achat (% du portefeuille)", "Max risk per purchase (% of portfolio)", "حداکثر ریسک هر خرید (٪ از سبد)"],
+  targetWeight: ["Poids visé par ligne (%)", "Target weight per stock (%)", "وزن هدف هر سهم (٪)"],
+  maxWeight: ["Poids maximum par ligne (%)", "Max weight per stock (%)", "حداکثر وزن هر سهم (٪)"],
+  trailingStop: ["Stop suiveur (× ATR)", "Trailing stop (× ATR)", "حد ضرر متحرک (× ATR)"],
+  takeProfit: ["Prise de bénéfice partielle à partir de (+%)", "Partial profit-taking from (+%)", "برداشت بخشی از سود از (+٪)"],
+  buyScoreL: ["Score minimum pour acheter", "Minimum score to buy", "حداقل امتیاز برای خرید"],
+  sellScoreL: ["Score maximum avant d'alléger", "Maximum score before trimming", "حداکثر امتیاز پیش از فروش بخشی"],
+  marketData: ["Données de marché (gratuites)", "Market data (free)", "داده‌های بازار (رایگان)"],
+  priceSource: ["Source des cours", "Price source", "منبع قیمت"],
+  srcYahoo: ["Yahoo Finance via mon relais (Paris, Europe, US)", "Yahoo Finance via my relay (Paris, Europe, US)", "یاهو فایننس از طریق رلهٔ من (پاریس، اروپا، آمریکا)"],
+  srcTd: ["Twelve Data (gratuit : actions US seulement)", "Twelve Data (free: US stocks only)", "Twelve Data (رایگان: فقط سهام آمریکا)"],
+  relayUrl: ["Adresse du relais Yahoo", "Yahoo relay address", "نشانی رلهٔ یاهو"],
+  tdKey: ["Clé Twelve Data", "Twelve Data key", "کلید Twelve Data"],
+  fhKey: ["Clé Finnhub (actus US, facultatif)", "Finnhub key (US news, optional)", "کلید Finnhub (اخبار آمریکا، اختیاری)"],
+  get: ["obtenir", "get one", "دریافت"],
+  priceCache: ["Cache des cours (minutes)", "Price cache (minutes)", "ذخیرهٔ قیمت‌ها (دقیقه)"],
+  newsCache: ["Cache des actus (minutes)", "News cache (minutes)", "ذخیرهٔ اخبار (دقیقه)"],
+  aiSection: ["IA (facultatif, à la demande)", "AI (optional, on demand)", "هوش مصنوعی (اختیاری، در صورت درخواست)"],
+  aiProvider: ["Fournisseur IA", "AI provider", "ارائه‌دهندهٔ هوش مصنوعی"],
+  anthropicKey: ["Clé API Anthropic", "Anthropic API key", "کلید API آنتروپیک"],
+  claudeModel: ["Modèle Claude", "Claude model", "مدل Claude"],
+  openaiKey: ["Clé API OpenAI", "OpenAI API key", "کلید API اوپن‌ای‌آی"],
+  openaiModel: ["Modèle OpenAI", "OpenAI model", "مدل اوپن‌ای‌آی"],
+  loadListPh: ["Chargez la liste →", "Load the list →", "فهرست را بارگذاری کنید ←"],
+  loadList: ["Charger la liste", "Load list", "بارگذاری فهرست"],
+  oaiHint: [
+    "Collez la clé, puis « Charger la liste » : l'app affiche les modèles disponibles sur votre compte. Les modèles « mini » / « nano » sont les moins chers.",
+    "Paste the key, then \"Load list\": the app shows the models available on your account. \"mini\" / \"nano\" models are the cheapest.",
+    "کلید را وارد کنید و سپس «بارگذاری فهرست» را بزنید تا مدل‌های حساب شما نمایش داده شود. مدل‌های «mini» / «nano» ارزان‌ترین‌اند.",
+  ],
+  oaiPasteFirst: ["Collez d'abord votre clé OpenAI.", "Paste your OpenAI key first.", "ابتدا کلید اوپن‌ای‌آی را وارد کنید."],
+  oaiFound: ["{n} modèle(s) trouvés. Touchez le champ pour choisir, puis Enregistrer.", "{n} model(s) found. Tap the field to choose, then Save.", "{n} مدل پیدا شد. روی کادر بزنید، انتخاب کنید و سپس ذخیره کنید."],
+  monthlyBudget: ["Plafond mensuel (tokens)", "Monthly cap (tokens)", "سقف ماهانه (توکن)"],
+  aiCacheHours: ["Réutiliser un avis IA pendant (heures)", "Reuse an AI opinion for (hours)", "استفادهٔ مجدد از نظر هوش مصنوعی به مدت (ساعت)"],
+  usageLine: ["Ce mois-ci : {calls} appel(s), {total} / {budget} tokens", "This month: {calls} call(s), {total} / {budget} tokens", "این ماه: {calls} درخواست، {total} / {budget} توکن"],
+  usageCostOpenai: ["coût : voir votre tableau de bord OpenAI", "cost: see your OpenAI dashboard", "هزینه: داشبورد اوپن‌ای‌آی را ببینید"],
+  export: ["Exporter", "Export", "خروجی گرفتن"],
+  import: ["Importer", "Import", "وارد کردن"],
+  purge: ["Vider le cache", "Clear cache", "پاک کردن حافظهٔ موقت"],
+  resetRules: ["Règles par défaut", "Default rules", "قواعد پیش‌فرض"],
+  localData: ["Vos données restent sur cet appareil (stockage du navigateur). Exportez régulièrement une sauvegarde.", "Your data stays on this device (browser storage). Export a backup regularly.", "داده‌های شما روی همین دستگاه می‌ماند (حافظهٔ مرورگر). مرتباً پشتیبان بگیرید."],
+  settingsSaved: ["Réglages enregistrés", "Settings saved", "تنظیمات ذخیره شد"],
+  cacheCleared: ["Cache vidé", "Cache cleared", "حافظهٔ موقت پاک شد"],
+  rulesReset: ["Règles réinitialisées", "Rules reset", "قواعد بازنشانی شد"],
+  backupImported: ["Sauvegarde importée", "Backup imported", "پشتیبان وارد شد"],
+
+  // ---- données ----
+  relayMissing: ["Adresse du relais Yahoo manquante (Réglages)", "Yahoo relay address missing (Settings)", "نشانی رلهٔ یاهو وارد نشده (تنظیمات)"],
+  cannotReach: ["Impossible de joindre {h} (pas d'Internet, ou adresse pas encore active — réessayez dans 1 min)", "Cannot reach {h} (no Internet, or address not active yet — retry in 1 min)", "اتصال به {h} ممکن نیست (اینترنت قطع است یا نشانی هنوز فعال نشده — یک دقیقه دیگر تلاش کنید)"],
+  noPriceData: ["Aucune donnée de cours", "No price data", "داده‌ای از قیمت نیست"],
+  tdKeyMissing: ["Clé Twelve Data manquante (Réglages)", "Twelve Data key missing (Settings)", "کلید Twelve Data وارد نشده (تنظیمات)"],
+  searchRelayDown: ["Relais Yahoo injoignable ({m}). Résultats de secours affichés ; vérifiez l'adresse du relais dans Réglages.", "Yahoo relay unreachable ({m}). Showing fallback results; check the relay address in Settings.", "رلهٔ یاهو در دسترس نیست ({m}). نتایج جایگزین نمایش داده شد؛ نشانی رله را در تنظیمات بررسی کنید."],
+  searchNoRelay: ["Relais Yahoo non configuré : la recherche fonctionne, mais les cours ne se chargeront pas tant que l'adresse du relais n'est pas renseignée dans Réglages.", "Yahoo relay not set up: search works, but prices won't load until the relay address is entered in Settings.", "رلهٔ یاهو تنظیم نشده: جستجو کار می‌کند، اما تا نشانی رله در تنظیمات وارد نشود قیمت‌ها بارگذاری نمی‌شوند."],
+};
+
+const IDX = { fr: 0, en: 1, fa: 2 };
+
+export function lang() {
+  const l = getState().settings.lang;
+  return IDX[l] != null ? l : "fr";
+}
+export const langInfo = () => LANGS.find((l) => l.id === lang());
+export const locale = () => langInfo().locale;
+
+export function t(key, vars) {
+  const row = D[key];
+  let s = row ? row[IDX[lang()]] ?? row[0] : key;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}
+
+// Langue et sens d'écriture de la page (le persan s'écrit de droite à gauche)
+export function applyDocumentLang() {
+  const info = langInfo();
+  document.documentElement.lang = info.id;
+  document.documentElement.dir = info.dir;
+}

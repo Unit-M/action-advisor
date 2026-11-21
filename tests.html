@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tests Action Advisor</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; padding: 16px; background: #fff; color: #111; }
+    .ok { color: #15803d; } .ko { color: #c0262d; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Tests (logique sans IA)</h1>
+  <p id="sum"></p>
+  <ul id="out"></ul>
+  <script type="module">
+    import { sma, ema, rsi, atr, macd, summarize } from "./js/indicators.js";
+    import { scoreHeadline, aggregateSentiment } from "./js/sentiment.js";
+    import { computePositions, DEFAULT_SETTINGS } from "./js/store.js";
+    import { advise } from "./js/advisor.js";
+
+    const out = document.getElementById("out");
+    let pass = 0, fail = 0;
+    const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+    function test(name, fn) {
+      try { fn(); pass++; out.insertAdjacentHTML("beforeend", `<li class="ok">✓ ${name}</li>`); }
+      catch (e) { fail++; out.insertAdjacentHTML("beforeend", `<li class="ko">✗ ${name} — ${e.message}</li>`); }
+    }
+    const assert = (c, msg = "assertion") => { if (!c) throw new Error(msg); };
+
+    // séries synthétiques
+    const mk = (closes, start = "2025-01-01") => closes.map((c, i) => {
+      const d = new Date(Date.parse(start) + i * 86400000).toISOString().slice(0, 10);
+      return { date: d, open: c, high: c * 1.01, low: c * 0.99, close: c, volume: 1000 };
+    });
+    const up = Array.from({ length: 260 }, (_, i) => 100 + i * 0.5 + Math.sin(i / 3) * 2);
+    const down = Array.from({ length: 260 }, (_, i) => 230 - i * 0.5 + Math.sin(i / 3) * 2);
+
+    test("SMA", () => {
+      const r = sma([1, 2, 3, 4, 5], 2);
+      assert(r[0] === null && r[1] === 1.5 && r[4] === 4.5, JSON.stringify(r));
+    });
+    test("EMA amorcée par la SMA", () => {
+      const r = ema([1, 2, 3, 4, 5], 3);
+      assert(r[1] === null && near(r[2], 2) && near(r[3], 3) && near(r[4], 4), JSON.stringify(r));
+    });
+    test("RSI = 100 si uniquement des hausses", () => {
+      const r = rsi(Array.from({ length: 20 }, (_, i) => i + 1), 14);
+      assert(r[13] === null && r[14] === 100);
+    });
+    test("RSI = 0 si uniquement des baisses", () => {
+      const r = rsi(Array.from({ length: 20 }, (_, i) => 50 - i), 14);
+      assert(near(r[19], 0));
+    });
+    test("RSI ~50 sur une alternance régulière", () => {
+      const r = rsi(Array.from({ length: 100 }, (_, i) => 100 + (i % 2)), 14);
+      assert(r[99] > 40 && r[99] < 60, r[99]);
+    });
+    test("ATR constant", () => {
+      const n = 30, h = Array(n).fill(11), l = Array(n).fill(9), c = Array(n).fill(10);
+      const r = atr(h, l, c, 14);
+      assert(near(r[29], 2), r[29]);
+    });
+    test("MACD positif en tendance haussière", () => {
+      const m = macd(Array.from({ length: 100 }, (_, i) => 100 * 1.01 ** i));
+      assert(m.line[99] > 0 && m.signal[99] > 0);
+    });
+    test("summarize renvoie les champs attendus", () => {
+      const s = summarize(mk(up));
+      for (const k of ["price", "sma50", "sma200", "rsi14", "atr14", "high52", "perf1y", "volatility"]) assert(s[k] != null, k);
+    });
+
+    test("Sentiment FR positif / négatif", () => {
+      assert(scoreHeadline("Airbus relève ses objectifs, le titre s'envole") > 0.3);
+      assert(scoreHeadline("Le titre chute après un avertissement sur résultats") < -0.3);
+      assert(scoreHeadline("Résultats trimestriels publiés jeudi") === 0);
+    });
+    test("Sentiment : mots du prototype JS ignorés", () => {
+      assert(scoreHeadline("constructor toString valueOf") === 0);
+    });
+    test("Sentiment EN + négation", () => {
+      assert(scoreHeadline("Apple beats estimates, shares surge") > 0.3);
+      assert(scoreHeadline("Company did not miss estimates") > 0);
+    });
+    test("Agrégation pondérée par la fraîcheur", () => {
+      const now = Date.now();
+      const s = aggregateSentiment([{ title: "shares plunge", datetime: now }, { title: "shares surge", datetime: now - 20 * 86400000 }], now);
+      assert(s.score < 0 && s.count === 2);
+    });
+
+    test("PRU et plus-value réalisée", () => {
+      const p = computePositions([
+        { assetId: "X", type: "BUY", qty: 10, price: 100, fees: 0, date: "2025-01-01" },
+        { assetId: "X", type: "BUY", qty: 10, price: 120, fees: 0, date: "2025-02-01" },
+        { assetId: "X", type: "SELL", qty: 5, price: 130, fees: 0, date: "2025-03-01" },
+      ]).X;
+      assert(p.qty === 15 && near(p.avgPrice, 110) && near(p.realized, 100), JSON.stringify(p));
+    });
+    test("Vente totale puis rachat : nouvelle date de 1er achat", () => {
+      const p = computePositions([
+        { assetId: "X", type: "BUY", qty: 1, price: 10, date: "2025-01-01" },
+        { assetId: "X", type: "SELL", qty: 1, price: 12, date: "2025-02-01" },
+        { assetId: "X", type: "BUY", qty: 2, price: 11, date: "2025-03-01" },
+      ]).X;
+      assert(p.qty === 2 && p.firstBuy === "2025-03-01" && near(p.avgPrice, 11));
+    });
+
+    const S = { ...DEFAULT_SETTINGS };
+    const S20 = { ...DEFAULT_SETTINGS, buyScore: 20 };
+    test("Tendance haussière, pas de position : Acheter avec quantité > 0", () => {
+      const a = advise({ candles: mk(up), position: null, portfolioValue: 10000, cash: 5000, settings: S20 });
+      assert(a.score > 0, "score " + a.score);
+      assert(a.action === "BUY" && a.qty > 0, a.action + " " + a.qty);
+      assert(a.qty * a.price <= 1000 + 1e-6, "dépasse le poids cible 10 %");
+    });
+    test("Pas de liquidités : pas d'achat", () => {
+      const a = advise({ candles: mk(up), position: null, portfolioValue: 10000, cash: 0, settings: S20 });
+      assert(a.qty === 0 && a.action === "WAIT");
+    });
+    test("Survente en tendance baissière : pas de bonus", () => {
+      const a = advise({ candles: mk(down), settings: S });
+      assert(a.score <= -35 && a.action === "WAIT", a.score);
+    });
+    test("Tendance baissière détenue : alléger ou vendre", () => {
+      const a = advise({ candles: mk(down), position: { qty: 10, avgPrice: 200, firstBuy: "2025-01-01" }, portfolioValue: 5000, cash: 0, settings: S });
+      assert(a.score < 0 && ["SELL_ALL", "SELL_PART"].includes(a.action), a.action + " " + a.score);
+    });
+    test("Krach sous le stop suiveur : Vendre tout (urgent)", () => {
+      const c = [...up.slice(0, 250), ...Array.from({ length: 10 }, (_, i) => 220 - i * 6)];
+      const a = advise({ candles: mk(c), position: { qty: 5, avgPrice: 150, firstBuy: "2025-01-01" }, portfolioValue: 5000, cash: 0, settings: S });
+      assert(a.action === "SELL_ALL" && a.qty === 5 && a.urgent, a.action);
+    });
+    test("Ligne trop lourde : alléger jusqu'au poids cible", () => {
+      const price = up[up.length - 1];
+      const a = advise({ candles: mk(up), position: { qty: 50, avgPrice: price, firstBuy: "2025-09-01" }, portfolioValue: 50 * price + 1000, cash: 1000, settings: S });
+      assert(a.action === "SELL_PART" && a.qty > 0 && a.qty < 50, a.action + " " + a.qty);
+    });
+    test("Alerte de prix utilisateur", () => {
+      const a = advise({ candles: mk(up), settings: S, alert: { below: null, above: 1 } });
+      assert(a.alerts.length === 1 && a.urgent);
+    });
+    test("Historique insuffisant : Attendre", () => {
+      const a = advise({ candles: mk([1, 2, 3]), settings: S });
+      assert(a.action === "WAIT");
+    });
+
+    document.getElementById("sum").innerHTML = `<b class="${fail ? "ko" : "ok"}">${pass} réussi(s), ${fail} échec(s)</b>`;
+  </script>
+</body>
+</html>
