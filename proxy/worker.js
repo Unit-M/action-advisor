@@ -6,15 +6,21 @@
 //   1. Créer un compte gratuit sur https://dash.cloudflare.com → Workers & Pages → Create → Worker.
 //   2. Remplacer le code par ce fichier → Deploy.
 //   3. Copier l'adresse (https://xxx.workers.dev) dans Action Advisor → Réglages → « Adresse du relais ».
-//   4. (Conseillé) mettre l'adresse de votre app dans ALLOWED_ORIGIN pour que personne d'autre ne l'utilise.
+//   4. Seules les adresses de ALLOWED_ORIGINS peuvent l'utiliser depuis un navigateur.
 
-const ALLOWED_ORIGIN = "*"; // ex. "https://votre-pseudo.github.io"
+const ALLOWED_ORIGINS = [
+  "https://unit-m.github.io", // l'app publiée sur GitHub Pages
+  "http://localhost:8000", // tests sur l'ordinateur (python3 -m http.server 8000)
+];
 const ALLOWED_PATHS = [/^\/v8\/finance\/chart\/[^/]+$/, /^\/v1\/finance\/search$/];
 
 export default {
   async fetch(request) {
+    const origin = request.headers.get("Origin") || "";
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) return new Response("Origine non autorisée", { status: 403 });
     const cors = {
-      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+      "Access-Control-Allow-Origin": origin || ALLOWED_ORIGINS[0],
+      Vary: "Origin",
       "Access-Control-Allow-Methods": "GET, OPTIONS",
       "Access-Control-Max-Age": "86400",
     };
