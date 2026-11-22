@@ -131,6 +131,7 @@ dialog#add .sheet header { padding-top: 12px; }
 .sheet header { display: flex; gap: 12px; align-items: center; margin: 0 -16px 10px; padding: calc(env(safe-area-inset-top) + 18px) 16px 10px;
   position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .close { background: var(--neutral-bg); border: 0; color: var(--text); width: 40px; height: 40px; border-radius: 50%; font-size: 18px; flex: none; }
+.close:focus { outline: none; box-shadow: none; }
 .price-big { font-size: 26px; font-weight: 700; margin: 6px 0; }
 /* courbe interactive */
 .chart-box { background: var(--card); border-radius: 12px; padding: 10px 10px 4px; margin: 6px 0; }
