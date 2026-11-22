@@ -224,3 +224,5 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 .course h4 { margin: 14px 0 4px; font-size: 15px; }
 .course h4:first-child { margin-top: 0; }
 .course p { margin: 0 0 6px; }
+.share-text { white-space: pre-line; user-select: text; -webkit-user-select: text; font-size: 14px; background: var(--bg); border-radius: 10px; padding: 10px; overflow-wrap: anywhere; }
+#term-dlg .actions { flex-wrap: wrap; }

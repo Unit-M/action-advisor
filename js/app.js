@@ -370,7 +370,21 @@ function renderSettings() {
       <button type="button" class="btn" id="reset-rules">${t("resetRules")}</button>
     </div>
     <p class="muted small">${t("localData")}</p>
+    <h3>${t("shareTitle")}</h3>
+    <button type="button" class="btn primary" id="share-app">${t("shareBtn")}</button>
   </form>`;
+}
+
+// ---------- partager l'appli ----------
+const APP_URL = "https://unit-m.github.io/action-advisor/";
+const shareText = () => t("shareMsg", { url: APP_URL });
+function openShare() {
+  let dlg = $("#term-dlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "term-dlg"; document.body.appendChild(dlg); dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); }
+  dlg.innerHTML = `<div class="term-box"><b>${esc(t("shareBtn"))}</b>
+    <p class="share-text">${esc(shareText())}</p>
+    <div class="actions"><button class="btn" data-share-copy>${esc(t("copy"))}</button>${navigator.share ? `<button class="btn primary" data-share-send>${esc(t("send"))}</button>` : ""}<button class="btn" data-term-close>OK</button></div></div>`;
+  if (!dlg.open) dlg.showModal();
 }
 
 let aiMod = null;
@@ -804,6 +818,12 @@ function openTxForm(asset, type, a = null) {
 document.addEventListener("click", (e) => {
   const tm = e.target.closest("[data-term]");
   if (tm) { e.preventDefault(); e.stopPropagation(); showTerm(tm.dataset.term); return; }
+  if (e.target.closest("[data-share-copy]")) {
+    navigator.clipboard?.writeText(shareText()).then(() => toast(t("copied"), "good"), () => toast(t("copyFail"), "bad"));
+    return;
+  }
+  if (e.target.closest("[data-share-send]")) { navigator.share({ text: shareText() }).catch(() => {}); return; }
+  if (e.target.closest("#share-app")) { e.preventDefault(); openShare(); return; }
   if (e.target.closest("[data-term-close]")) { $("#term-dlg")?.close(); return; }
   if (e.target.closest("[data-term-guide]")) { $("#term-dlg")?.close(); document.querySelectorAll("dialog[open]").forEach((d) => d.close()); view.tab = "guide"; render(); window.scrollTo(0, 0); return; }
   const el = e.target.closest("[data-tab],[data-open],[data-close],#refresh,#add-btn,#ai-portfolio,#export,#purge,#reset-rules");
