@@ -228,6 +228,21 @@ document.addEventListener("load", (e) => {
 }, true);
 document.addEventListener("error", (e) => { if (e.target.classList?.contains("logo-img")) markLogoFail(e.target); }, true);
 
+// jauge « moment d'achat »
+function timingPill(tm) {
+  if (!tm) return "";
+  return `<span class="tpill ${tm.level}">${term("buyTiming", t("buyTiming"))} <b>${tm.score}</b> · ${esc(t("bt_" + tm.level))}</span>`;
+}
+function timingBlock(tm) {
+  if (!tm) return "";
+  return `<section class="timing">
+    <h3>${term("buyTiming", t("buyTiming"))}</h3>
+    <div class="tgauge"><div class="tbar ${tm.level}" style="width:${tm.score}%"></div></div>
+    <p><b class="tlabel ${tm.level}">${tm.score}/100 · ${esc(t("bt_" + tm.level))}</b></p>
+    <ul class="reasons">${tm.reasons.map((x) => `<li class="${tone(x.pts)}"><b>${x.pts > 0 ? "+" : ""}${x.pts}</b> ${esc(x.txt)}</li>`).join("")}</ul>
+  </section>`;
+}
+
 function badge(a) {
   const A = ACTIONS[a.action];
   const q = a.qty ? ` ${qtyTxt(a.qty)}` : "";
@@ -259,6 +274,7 @@ function renderPortfolio({ rows }) {
       <div class="info"><span class="muted">${qtyTxt(p.qty)} × ${term("avgCost", t("avgCost"))}</span> ${money(p.avgPrice, r.asset.currency)}</div>
       ${val != null ? `<div class="info"><span class="muted">${term("posValue", t("posValue"))}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
         · <span class="${tone(val - p.cost)}">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}
+      ${r.a.timing ? `<div class="info">${timingPill(r.a.timing)}</div>` : ""}
       <div class="chartrow">${sparkline(r.candles)}<div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div></div>
       ${r.a.urgent ? `<div class="alert">${esc(r.a.reasons[0]?.txt)}${r.a.alerts.map((x) => " · " + esc(x)).join("")}</div>` : ""}
     </li>`;
@@ -268,6 +284,7 @@ function renderPortfolio({ rows }) {
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="info muted small">${r.candles?.length ? `${t("oneMonth")} : <span class="${tone(m)}">${pctTxt(m)}</span>` : t("pricesNotLoaded")}</div>
+      ${r.a.timing ? `<div class="info">${timingPill(r.a.timing)}</div>` : ""}
       <div class="chartrow">${sparkline(r.candles)}<div class="end"><b>${money(r.price, r.asset.currency)}</b></div></div>
       ${r.a.urgent ? `<div class="alert">${r.a.alerts.map(esc).join(" · ")}</div>` : ""}
     </li>`;
@@ -689,6 +706,7 @@ function openDetail(id, data = compute(), silent = false) {
       </form>
       <p class="muted small">${t("manualHelp")}</p>
     </section>` : ""}
+    ${timingBlock(a.timing)}
     <section class="advice">
       <h3>${t("adviceRules")}</h3>
       <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: qtyTxt(a.qty) }) : ""}</b> — ${term("score", t("score"))} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
@@ -797,6 +815,7 @@ function renderAIAsset(x, cur) {
     <p><b>${esc(decLabel(x.decision))}${x.quantite ? " " + t("shares", { n: qtyTxt(+x.quantite) }) : ""}</b> · ${t("confidence", { n: x.confiance })}
       · ${x.accord_avec_regles ? t("agreesRules") : `<b>${t("disagreesRules")}</b>`}</p>
     <p>${esc(x.resume)}</p>
+    ${x.moment_achat_ia != null ? `<p><b>${t("aiTiming")} : ${x.moment_achat_ia}/100</b>${x.avis_jauge ? ` — ${esc(x.avis_jauge)}` : ""}</p>` : ""}
     <div class="grid3">
       <div><span class="muted small">${t("limitPrice")}</span><b>${x.prix_limite ? money(x.prix_limite, cur) : "—"}</b></div>
       <div><span class="muted small">${t("stop")}</span><b>${x.stop ? money(x.stop, cur) : "—"}</b></div>

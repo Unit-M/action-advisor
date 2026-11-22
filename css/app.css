@@ -241,3 +241,12 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 .accrow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; margin-bottom: 8px; }
 .accrow .btn.small { min-height: 40px; padding: 6px 12px; }
 .manual-add { width: 100%; margin-top: 12px; }
+/* moment d'achat */
+.tpill { display: inline-block; font-size: 13px; padding: 2px 8px; border-radius: 999px; background: var(--neutral-bg); color: var(--muted); }
+.tpill.good { background: var(--good-bg); color: var(--good); }
+.tpill.wait { background: var(--bad-bg); color: var(--bad); }
+.tpill .term { text-decoration-color: currentColor; }
+.tgauge { height: 10px; border-radius: 999px; background: var(--neutral-bg); overflow: hidden; margin: 4px 0 6px; }
+.tbar { height: 100%; border-radius: 999px; background: var(--muted); }
+.tbar.good { background: var(--good); } .tbar.wait { background: var(--bad); } .tbar.neutral { background: var(--warn); }
+.tlabel.good { color: var(--good); } .tlabel.wait { color: var(--bad); } .tlabel.neutral { color: var(--warn); }

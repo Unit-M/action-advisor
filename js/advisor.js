@@ -62,6 +62,39 @@ export function scoreAsset(ind, news) {
   return { score: Math.max(-100, Math.min(100, s)), reasons, sentiment: sent };
 }
 
+// ---- Moment d'achat (0-100) : est-ce un bon moment pour acheter ce titre ? ----
+// Indépendant de la position détenue. 50 = neutre. On favorise : tendance de fond haussière + repli récent + reprise d'élan.
+export function buyTiming(ind, sent) {
+  if (!ind?.price) return null;
+  const p = ind.price, items = [];
+  const add = (pts, txt) => items.push({ pts, txt });
+  const up = ind.sma200 != null ? p > ind.sma200 : null;
+  if (up === true) add(15, t("bt_up")); else if (up === false) add(-20, t("bt_down"));
+  if (ind.sma50 != null && ind.sma200 != null) { if (ind.sma50 > ind.sma200) add(5, t("bt_golden")); else add(-5, t("bt_death")); }
+  if (ind.high52) {
+    const dd = 1 - p / ind.high52, d = (dd * 100).toFixed(0);
+    if (up !== false && dd >= 0.05 && dd <= 0.2) add(15, t("bt_dip", { d }));
+    else if (dd < 0.03) add(-5, t("bt_top"));
+    else if (up === false && dd > 0.3) add(-5, t("bt_crash", { d }));
+  }
+  if (ind.rsi14 != null) {
+    const r = ind.rsi14.toFixed(0);
+    if (ind.rsi14 > 70) add(-15, t("bt_rsiHigh", { r }));
+    else if (ind.rsi14 < 30) add(up === false ? -5 : 12, t(up === false ? "bt_knife" : "bt_rsiLow", { r }));
+    else if (ind.rsi14 <= 45 && up !== false) add(10, t("bt_rsiDip", { r }));
+  }
+  if (up && ind.sma50 && Math.abs(p / ind.sma50 - 1) < 0.03) add(5, t("bt_ma50"));
+  if (ind.macdHist != null && ind.macdHistPrev != null) {
+    if (ind.macdHistPrev <= 0 && ind.macdHist > 0) add(8, t("bt_macdTurn"));
+    else if (ind.macdHist > ind.macdHistPrev) add(4, t("bt_macdUp"));
+    else if (ind.macdHist < 0) add(-5, t("bt_macdDown"));
+  }
+  if (sent?.count >= 3 && sent.pos !== sent.neg) add(sent.pos > sent.neg ? 4 : -4, t(sent.pos > sent.neg ? "bt_newsPos" : "bt_newsNeg"));
+  const score = Math.max(0, Math.min(100, Math.round(50 + items.reduce((n, x) => n + x.pts, 0))));
+  const level = score >= 70 ? "good" : score >= 40 ? "neutral" : "wait";
+  return { score, level, reasons: items.sort((a, b) => Math.abs(b.pts) - Math.abs(a.pts)).slice(0, 3) };
+}
+
 const floor = (x) => Math.max(0, Math.floor(x + 1e-9));
 const round2 = (x) => Math.round(x * 100) / 100;
 
@@ -156,6 +189,7 @@ export function advise({ candles, news = [], position = null, portfolioValue = 0
     }
   }
   res.alerts = alerts;
+  res.timing = buyTiming(ind, sentiment);
   res.urgent = res.action === "SELL_ALL" || alerts.length > 0;
   return res;
 }

@@ -17,6 +17,7 @@ export const TERMS = {
   buySell: { fr: ["Points Achat / Vente", "Point vert = un de vos achats, point rouge = une de vos ventes. Touchez la courbe pour voir le détail."], en: ["Buy / Sell dots", "Green dot = one of your buys, red dot = one of your sells. Touch the chart to see details."] },
   // --- conseils ---
   score: { fr: ["Score (−100 à +100)", "Note globale calculée par l'appli en additionnant les signaux. Positif = plutôt achat, négatif = plutôt vente. Le stop passe avant le score."], en: ["Score (−100 to +100)", "Overall grade computed by adding up the signals. Positive = rather buy, negative = rather sell. The stop overrides the score."] },
+  buyTiming: { fr: ["Moment d'achat (0 à 100)", "Jauge qui dit si c'est un bon moment pour acheter ce titre. Elle favorise une tendance de fond haussière avec un repli récent (prix « en solde ») et un élan qui repart. 70+ = bon moment, 40-69 = neutre, sous 40 = attendre. Ce n'est pas une garantie de hausse."], en: ["Buy timing (0 to 100)", "Gauge telling whether it's a good time to buy this stock. It favours a long-term uptrend with a recent pullback (price \"on sale\") and returning momentum. 70+ = good time, 40-69 = neutral, below 40 = wait. Not a guarantee of gains."] },
   target: { fr: ["Objectif", "Prix où l'appli conseille d'encaisser une partie du gain."], en: ["Target", "Price at which the app advises taking part of the profit."] },
   buyZone: { fr: ["Zone d'achat", "Prix jugé intéressant pour acheter. « — » = ce n'est pas le moment."], en: ["Buy zone", "Price considered attractive for buying. \"—\" = not the right time."] },
   actions: { fr: ["Acheter, Renforcer, Conserver, Alléger, Vendre tout", "Acheter = 1re fois ; Renforcer = en racheter ; Conserver / Attendre = ne rien faire ; Alléger = vendre une partie ; Vendre tout = la totalité."], en: ["Buy, Add, Hold, Trim, Sell all", "Buy = first time; Add = buy more; Hold / Wait = do nothing; Trim = sell part; Sell all = everything."] },
@@ -38,7 +39,7 @@ export const TERMS = {
 export const SECTIONS = [
   { fr: "Votre portefeuille", en: "Your portfolio", keys: ["avgCost", "posValue", "quantity", "unrealized", "cash", "totalValue", "invested", "perfPf", "pnl"] },
   { fr: "Le graphique", en: "The chart", keys: ["price", "ma50", "ma200", "stop", "buySell"] },
-  { fr: "Les conseils", en: "The advice", keys: ["score", "target", "buyZone", "actions"] },
+  { fr: "Les conseils", en: "The advice", keys: ["buyTiming", "score", "target", "buyZone", "actions"] },
   { fr: "Les indicateurs", en: "The indicators", keys: ["rsi", "atr", "macd", "bollinger", "high52", "low52", "perf", "volatility", "news"] },
 ];
 
@@ -97,6 +98,7 @@ const FA = {
   stop: ["حد ضرر (متحرک)", "قیمت کف: اگر قیمت از آن پایین‌تر برود، برنامه پیشنهاد فروش می‌دهد. با بالا رفتن قیمت بالا می‌رود ولی هرگز پایین نمی‌آید تا سودتان حفظ شود."],
   buySell: ["نقاط خرید / فروش", "نقطهٔ سبز = یکی از خریدهای شما، نقطهٔ قرمز = یکی از فروش‌های شما. نمودار را لمس کنید تا جزئیات را ببینید."],
   score: ["امتیاز (۱۰۰− تا ۱۰۰+)", "نمرهٔ کلی که برنامه با جمع سیگنال‌ها حساب می‌کند. مثبت = بیشتر خرید، منفی = بیشتر فروش. حد ضرر بر امتیاز مقدم است."],
+  buyTiming: ["زمان خرید (۰ تا ۱۰۰)", "شاخصی که می‌گوید آیا الان زمان خوبی برای خرید این سهم است. روند بلندمدت صعودی همراه با اصلاح اخیر (قیمت «حراج») و بازگشت شتاب را ترجیح می‌دهد. ۷۰ به بالا = زمان مناسب، ۴۰ تا ۶۹ = خنثی، زیر ۴۰ = صبر کنید. تضمین سود نیست."],
   target: ["هدف قیمتی", "قیمتی که برنامه پیشنهاد می‌کند بخشی از سود را برداشت کنید."],
   buyZone: ["محدودهٔ خرید", "قیمتی که برای خرید مناسب است. «—» یعنی الان زمان خرید نیست."],
   actions: ["خرید، افزایش، نگه‌داری، کاهش، فروش کامل", "خرید = بار اول؛ افزایش = خرید بیشتر؛ نگه‌داری / صبر = کاری نکنید؛ کاهش = فروش بخشی؛ فروش کامل = همه."],

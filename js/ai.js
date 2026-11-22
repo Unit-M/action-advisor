@@ -40,8 +40,10 @@ const ASSET_SCHEMA = {
     resume: { type: "string", description: "2 phrases maximum" },
     points_cles: { type: "array", items: { type: "string" }, description: "3 points maximum" },
     risques: { type: "array", items: { type: "string" }, description: "3 risques maximum" },
+    moment_achat_ia: { type: "integer", description: "Ta propre note 0 à 100 : est-ce un bon moment pour acheter ce titre maintenant ?" },
+    avis_jauge: { type: "string", description: "1 à 2 phrases : d'accord ou non avec la jauge automatique « moment d'achat », et pourquoi (actualités, contexte)" },
   },
-  required: ["decision", "quantite", "prix_limite", "stop", "objectif", "confiance", "accord_avec_regles", "resume", "points_cles", "risques"],
+  required: ["decision", "quantite", "prix_limite", "stop", "objectif", "confiance", "accord_avec_regles", "resume", "points_cles", "risques", "moment_achat_ia", "avis_jauge"],
   additionalProperties: false,
 };
 
@@ -239,9 +241,10 @@ export async function adviseAsset({ asset, a, position, news, portfolioValue, ca
       verdict: a.action, quantite: a.qty, score: a.score, stop: a.levels.stop, objectif: a.levels.target, zone_achat: a.levels.buyZone,
       raisons: a.reasons.slice(0, 6).map((r) => r.txt),
     },
+    jauge_moment_achat: a.timing ? { note: a.timing.score, niveau: a.timing.level, raisons: a.timing.reasons.map((r) => r.txt) } : null,
     actualites: (news || []).slice(0, 8).map((n) => `${new Date(n.datetime).toISOString().slice(0, 10)} ${String(n.title).slice(0, 140)}`),
   };
-  const content = `Donne ton avis sur cette ligne.\n${JSON.stringify(payload)}`;
+  const content = `Donne ton avis sur cette ligne, et dis notamment si c'est le bon moment pour acheter, en commentant la jauge automatique « moment d'achat ».\n${JSON.stringify(payload)}`;
   const key = `ai:${asset.id}:${settings.aiProvider}:${activeModel(settings)}:${langInfo().id}:${hash(content)}`;
   if (force) cacheSet(key, null);
   return ask(content, ASSET_SCHEMA, key);
