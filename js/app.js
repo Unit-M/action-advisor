@@ -398,7 +398,7 @@ async function drawChart(r) {
     if (i < 0) i = n - 1;
     (txAt[i] ||= []).push(x);
   }
-  const vals = [...closes, ...m50, ...m200, stopLvl, ...txs.map((x) => x.price)].filter((v) => v != null && isFinite(v));
+  const vals = [...closes, ...m50, ...m200, stopLvl].filter((v) => v != null && isFinite(v));
   const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
   const X = (i) => (i / (n - 1)) * W;
   const Y = (v) => H - 6 - ((v - min) / span) * (H - 12);
@@ -415,7 +415,7 @@ async function drawChart(r) {
       ${line(m200, "m200")}${line(m50, "m50")}${line(closes, "price")}
       <line class="cross" id="cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/>
     </svg>${Object.entries(txAt).flatMap(([i, list]) => list.map((x) =>
-      `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(x.price) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
+      `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(closes[+i]) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
   $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${txs.length ? `<span class="l txl buy">${t("buy")}</span><span class="l txl sell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
 
   const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.intraday
