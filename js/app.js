@@ -177,7 +177,7 @@ function render() {
 
 function badge(a) {
   const A = ACTIONS[a.action];
-  const q = a.qty ? ` ${a.qty}` : "";
+  const q = a.qty ? ` ${qtyTxt(a.qty)}` : "";
   return `<span class="badge ${A.tone}">${esc(actLabel(a.action))}${q}</span>`;
 }
 
