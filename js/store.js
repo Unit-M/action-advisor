@@ -34,6 +34,7 @@ function blank() {
     assets: {}, // id -> {id, symbol, mic, name, exchange, currency, country}
     transactions: [], // {id, assetId, accountId, type:'BUY'|'SELL', qty, price, fees, date}
     accounts: [{ id: "main", name: "", cash: 0 }], // comptes (courtiers) : chacun ses liquidités
+    manualPrices: {}, // placements sans cotation (FCPE…) : id -> [{date, close}] saisis à la main
     watch: [], // ids suivis sans position
     alerts: {}, // id -> {below, above}
     aiUsage: { month: "", input: 0, output: 0, calls: 0 },
@@ -60,6 +61,7 @@ function load() {
 // anciennes sauvegardes : un seul compte, qui reprend les liquidités globales
 function migrate(s) {
   if (!Array.isArray(s.accounts) || !s.accounts.length) s.accounts = [{ id: "main", name: "", cash: Number(s.settings?.cash) || 0 }];
+  if (!s.manualPrices || typeof s.manualPrices !== "object") s.manualPrices = {};
   return s;
 }
 

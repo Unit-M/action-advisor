@@ -127,6 +127,8 @@ function compute() {
       settings: st,
       alert: s.alerts[r.id],
     });
+    // placement à valeur manuelle : pas de cours quotidien, donc pas de conseil
+    if (r.asset.manual) r.a = { action: "HOLD", qty: 0, score: 0, reasons: [{ pts: 0, txt: t("manualNoAdvice") }], ind: null, levels: {}, price: r.price, alerts: [], urgent: false };
   }
   rows.sort((x, y) => (y.a.urgent - x.a.urgent) || (ACTIONS[x.a.action].rank - ACTIONS[y.a.action].rank) || Math.abs(y.a.score) - Math.abs(x.a.score));
   return { rows, positions, totalBase, investedBase, missingFx };
@@ -211,7 +213,7 @@ try { logoFail = new Set(JSON.parse(localStorage.getItem(LOGO_FAIL_KEY) || "[]")
 function logo(asset, cls = "") {
   const sym = String(asset?.symbol || "?").toUpperCase();
   let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const img = logoFail.has(sym) || LOGO_BAD.includes(sym) ? "" : `<img class="logo-img" alt="" loading="lazy" data-sym="${esc(sym)}" src="https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png">`;
+  const img = asset?.manual || logoFail.has(sym) || LOGO_BAD.includes(sym) ? "" : `<img class="logo-img" alt="" loading="lazy" data-sym="${esc(sym)}" src="https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png">`;
   return `<span class="logo ${cls}" style="--h:${h}" aria-hidden="true"><i>${esc(sym.replace(/[^A-Z0-9]/g, "").charAt(0) || "?")}</i>${img}</span>`;
 }
 const markLogoFail = (img) => {
@@ -675,9 +677,18 @@ function openDetail(id, data = compute(), silent = false) {
     ${r.position ? `<div class="grid3">
         <div><span class="muted small">${term("quantity", t("quantity"))}</span><b>${qtyTxt(r.position.qty)}</b></div>
         <div><span class="muted small">${term("avgCost", t("avgCost"))}</span><b>${money(r.position.avgPrice, cur)}</b></div>
-        <div><span class="muted small">${term("unrealized", t("unrealizedShort"))}</span><b class="${tone(ind.price - r.position.avgPrice)}">${pctTxt(ind.price / r.position.avgPrice - 1)}</b></div>
+        <div><span class="muted small">${term("unrealized", t("unrealizedShort"))}</span><b class="${tone((ind.price ?? r.price) - r.position.avgPrice)}">${pctTxt((ind.price ?? r.price) / r.position.avgPrice - 1)}</b></div>
       </div>` : ""}
 
+    ${r.asset.manual ? `<section>
+      <h3>${t("manualUpdate")}</h3>
+      <form id="manual-form" class="inline">
+        <label>${t("manualValue")}<input name="value" type="number" step="any" min="0" required value="${esc(r.price ?? "")}"></label>
+        <label>${t("date")}<input name="date" type="date" required value="${today()}"></label>
+        <button class="btn primary">${t("save")}</button>
+      </form>
+      <p class="muted small">${t("manualHelp")}</p>
+    </section>` : ""}
     <section class="advice">
       <h3>${t("adviceRules")}</h3>
       <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: qtyTxt(a.qty) }) : ""}</b> — ${term("score", t("score"))} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
@@ -850,12 +861,51 @@ async function runAIPortfolio() {
 }
 
 // ---------- ajout / transaction ----------
+// ---------- placement sans cotation (FCPE, fonds d'épargne salariale…) ----------
+function openManualForm() {
+  const dlg = $("#add");
+  const v = viewAcc();
+  dlg.innerHTML = `<div class="sheet">
+    <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${t("manualTitle")}</h2></header>
+    <p class="muted small">${t("manualIntro")}</p>
+    <form id="manual-new" class="settings">
+      <label>${t("manualName")}<input name="name" required placeholder="CASTOR"></label>
+      <label>${t("manualQty")}<input name="qty" type="number" step="any" min="0" required></label>
+      <label>${t("manualBuyPrice")}<input name="buy" type="number" step="any" min="0" required></label>
+      <label>${t("manualBuyDate")}<input name="buyDate" type="date" required value="${today()}"></label>
+      <label>${t("manualValue")}<input name="value" type="number" step="any" min="0" required></label>
+      <label>${t("manualValueDate")}<input name="valueDate" type="date" required value="${today()}"></label>
+      <label>${t("baseCurrency")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+      ${accounts().length > 1 ? `<label>${t("account")}<select name="account">${accounts().map((a) => `<option value="${esc(a.id)}" ${a.id === v ? "selected" : ""}>${esc(accName(a))}</option>`).join("")}</select></label>` : ""}
+      <button class="btn primary">${t("save")}</button>
+    </form></div>`;
+  if (!dlg.open) dlg.showModal();
+  $("#manual-new").onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const name = String(f.get("name")).trim(), qty = +f.get("qty"), buy = +f.get("buy"), value = +f.get("value");
+    if (!name || !(qty > 0) || !(buy > 0) || !(value > 0)) { toast(t("qtyPriceRequired"), "bad"); return; }
+    const id = "MAN-" + uid();
+    const acc = f.get("account") || (v !== "all" ? v : accounts()[0].id);
+    update((s) => {
+      s.assets[id] = { id, provider: "manual", manual: true, symbol: name.toUpperCase(), name: t("manualAsset"), exchange: "", currency: f.get("currency"), type: "Fonds" };
+      s.transactions.push({ id: uid(), assetId: id, accountId: acc, type: "BUY", qty, price: buy, fees: 0, date: f.get("buyDate") });
+      const pts = [{ date: f.get("buyDate"), close: buy }].filter((x) => x.date !== f.get("valueDate"));
+      pts.push({ date: f.get("valueDate"), close: value });
+      s.manualPrices[id] = pts;
+    });
+    dlg.close();
+    toast(t("txSaved"), "good");
+  };
+}
+
 function openAdd() {
   const dlg = $("#add");
   dlg.innerHTML = `<div class="sheet">
     <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${t("addStock")}</h2></header>
     <input id="q" type="search" placeholder="${esc(t("searchPh"))}" autocomplete="off" autocapitalize="characters" autofocus>
     <ul id="results" class="list results"></ul>
+    <button type="button" class="btn manual-add" id="manual-open">${t("manualBtn")}</button>
   </div>`;
   dlg.showModal();
   const q = $("#q");
@@ -960,6 +1010,7 @@ function openTxForm(asset, type, a = null) {
 
 // ---------- événements globaux ----------
 document.addEventListener("click", (e) => {
+  if (e.target.closest("#manual-open")) { openManualForm(); return; }
   const accb = e.target.closest("[data-acc]");
   if (accb) { update((s) => { s.settings.viewAccount = accb.dataset.acc; }); return; }
   if (e.target.closest("#add-acc")) {
@@ -1020,6 +1071,20 @@ document.addEventListener("click", (e) => {
     update((s) => { for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) if (!keep.includes(k)) s.settings[k] = v; });
     toast(t("rulesReset"));
   }
+});
+
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "manual-form") return;
+  e.preventDefault();
+  const f = new FormData(e.target), id = view.detail, v = +f.get("value"), d = f.get("date");
+  if (!(v > 0) || !id) return;
+  update((s) => {
+    const list = (s.manualPrices[id] ||= []).filter((x) => x.date !== d);
+    list.push({ date: d, close: v });
+    s.manualPrices[id] = list;
+  });
+  toast(t("manualUpdated"), "good");
+  openDetail(id);
 });
 
 document.addEventListener("submit", (e) => {

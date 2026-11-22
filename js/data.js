@@ -183,6 +183,7 @@ async function twelveCandles(asset) {
 
 // Renvoie {candles, currency?, fromCache, at, stale?, error?}
 export async function getCandles(asset, { force = false } = {}) {
+  if (asset.manual) return { candles: manualCandles(asset), fromCache: true, at: Date.now() };
   const key = `candles:${asset.id}`;
   const maxAge = settings().priceRefreshMinutes * 60000;
   const cached = cacheGet(key, null);
@@ -243,6 +244,7 @@ async function gdeltNews(asset) {
 }
 
 export async function getNews(asset, { force = false } = {}) {
+  if (asset.manual) return [];
   const st = settings();
   const key = `news:${asset.id}`;
   const cached = cacheGet(key, null);
@@ -268,7 +270,11 @@ export async function getNews(asset, { force = false } = {}) {
 }
 
 export const cachedNews = (asset) => cacheGet(`news:${asset.id}`, null)?.v || [];
-export const cachedCandles = (asset) => cacheGet(`candles:${asset.id}`, null)?.v || null;
+// placement à valeur manuelle : les « bougies » sont les valeurs saisies par l'utilisateur
+export const manualCandles = (asset) => (getState().manualPrices?.[asset.id] || [])
+  .slice().sort((a, b) => (a.date < b.date ? -1 : 1))
+  .map((x) => ({ date: x.date, open: x.close, high: x.close, low: x.close, close: x.close, volume: 0 }));
+export const cachedCandles = (asset) => (asset?.manual ? manualCandles(asset) : cacheGet(`candles:${asset.id}`, null)?.v || null);
 
 // ---------- Taux de change (pour additionner des lignes en devises différentes) ----------
 export async function getFx(from, to) {
@@ -331,6 +337,15 @@ const DAILY = { "1M": 22, "6M": 126, "1Y": 252 };
 
 // Renvoie { points: [{t (ms), close}], intraday, daily } ; daily = true → les moyennes mobiles s'appliquent
 export async function getSeries(asset, period) {
+  if (asset.manual) {
+    const days = { "1D": 1, "1W": 7, "1M": 31, "6M": 183, "1Y": 366, "5Y": 1830 }[period];
+    const from = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
+    const c = manualCandles(asset);
+    const inside = c.filter((x) => x.date >= from);
+    const before = c.filter((x) => x.date < from).at(-1); // valeur connue au début de la période
+    const pts = (before ? [{ ...before, date: from }, ...inside] : inside).map((x) => ({ t: Date.parse(x.date + "T12:00:00"), close: x.close }));
+    return { points: pts };
+  }
   if (DAILY[period]) {
     const c = cachedCandles(asset) || [];
     const pts = c.slice(-DAILY[period]).map((x) => ({ t: Date.parse(x.date + "T12:00:00"), close: x.close }));
