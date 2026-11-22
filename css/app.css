@@ -209,7 +209,8 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 
 /* termes touchables + guide */
 .term, .legend [data-term] { text-decoration: underline dotted; text-decoration-color: var(--muted); text-underline-offset: 3px; cursor: help; }
-#term-dlg { height: auto; max-width: 420px; width: calc(100% - 32px); border-radius: 16px; margin: auto; inset: 0; background: var(--card); }
+#term-dlg { height: fit-content; max-height: 70dvh; max-width: 380px; width: calc(100% - 32px); border-radius: 16px; margin: auto; inset: 0; background: var(--card); }
+#term-dlg .btn:focus { outline: none; box-shadow: none; }
 #term-dlg::backdrop { background: rgba(0, 0, 0, .5); }
 .term-box { padding: 18px; }
 .term-box b { font-size: 17px; }
