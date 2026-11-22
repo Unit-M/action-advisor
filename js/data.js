@@ -292,6 +292,26 @@ export async function getFx(from, to) {
     return cacheGet(key, null)?.v ?? null;
   }
 }
+// Taux de change jour par jour sur 2 ans (pour l'historique du portefeuille) : { "AAAA-MM-JJ": taux }
+export async function getFxSeries(from, to) {
+  if (!from || !to || from === to || !proxyBase()) return null;
+  const key = `fxs:${from}/${to}`;
+  const cached = cacheGet(key, 12 * 3600000);
+  if (cached) return cached.v;
+  try {
+    const j = await yahoo(`/v8/finance/chart/${from}${to}=X`, { range: "2y", interval: "1d" });
+    const res = j.chart?.result?.[0];
+    const closes = res?.indicators?.quote?.[0]?.close || [];
+    const map = {};
+    (res?.timestamp || []).forEach((ts, i) => { if (closes[i] > 0) map[new Date(ts * 1000).toISOString().slice(0, 10)] = +closes[i].toFixed(5); });
+    if (!Object.keys(map).length) throw new Error("fx");
+    cacheSet(key, map);
+    return map;
+  } catch {
+    return cacheGet(key, null)?.v ?? null;
+  }
+}
+export const cachedFxSeries = (from, to) => (from === to ? null : cacheGet(`fxs:${from}/${to}`, null)?.v ?? null);
 export function cachedFx(from, to) {
   if (!from || !to || from === to) return 1;
   return cacheGet(`fx:${from}/${to}`, null)?.v ?? null;

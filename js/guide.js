@@ -29,11 +29,14 @@ export const TERMS = {
   low52: { fr: ["Bas 52 s", "Prix le plus bas des 52 dernières semaines (1 an)."], en: ["52-week low", "Lowest price of the last 52 weeks (1 year)."] },
   perf: { fr: ["1 mois / 1 an", "Variation du cours sur 1 mois / sur 1 an."], en: ["1 month / 1 year", "Price change over 1 month / 1 year."] },
   volatility: { fr: ["Volatilité", "Ampleur des variations sur un an, en %. Plus elle est élevée, plus c'est risqué (ETF ≈ 15 %, petite société > 80 %)."], en: ["Volatility", "Size of price swings over a year, in %. Higher = riskier (ETF ≈ 15%, small company > 80%)."] },
+  invested: { fr: ["Investi", "Ligne en pointillés : le prix payé pour les actions que vous détenez ce jour-là (frais compris). Si la courbe de valeur est au-dessus, vous êtes en gain."], en: ["Invested", "Dashed line: what you paid for the shares you held that day (fees included). If the value line is above it, you're in profit."] },
+  perfPf: { fr: ["Performance", "Gain ou perte de la période divisé par l'argent investi en moyenne sur la période. Les apports d'argent ne comptent pas comme un gain."], en: ["Performance", "Profit or loss over the period divided by the average money invested. Deposits don't count as gains."] },
+  pnl: { fr: ["Gain / Perte", "Ce que vous avez gagné ou perdu sur la période : réalisé (actions vendues) + latent (actions encore détenues)."], en: ["Profit & Loss", "What you gained or lost over the period: realised (shares sold) + unrealised (shares still held)."] },
   news: { fr: ["Actus +3 / −1", "Nombre d'actualités récentes jugées positives / négatives sur l'entreprise."], en: ["News +3 / −1", "Number of recent news items judged positive / negative about the company."] },
 };
 
 export const SECTIONS = [
-  { fr: "Votre portefeuille", en: "Your portfolio", keys: ["avgCost", "posValue", "quantity", "unrealized", "cash", "totalValue"] },
+  { fr: "Votre portefeuille", en: "Your portfolio", keys: ["avgCost", "posValue", "quantity", "unrealized", "cash", "totalValue", "invested", "perfPf", "pnl"] },
   { fr: "Le graphique", en: "The chart", keys: ["price", "ma50", "ma200", "stop", "buySell"] },
   { fr: "Les conseils", en: "The advice", keys: ["score", "target", "buyZone", "actions"] },
   { fr: "Les indicateurs", en: "The indicators", keys: ["rsi", "atr", "macd", "bollinger", "high52", "low52", "perf", "volatility", "news"] },
@@ -105,6 +108,9 @@ const FA = {
   low52: ["کف ۵۲ هفته", "پایین‌ترین قیمت در ۵۲ هفتهٔ اخیر (یک سال)."],
   perf: ["۱ ماه / ۱ سال", "تغییر قیمت در یک ماه / یک سال گذشته."],
   volatility: ["نوسان", "میزان نوسان قیمت در یک سال، به درصد. هرچه بیشتر، پرریسک‌تر (ETF حدود ۱۵٪، شرکت کوچک بیش از ۸۰٪)."],
+  invested: ["سرمایه‌گذاری‌شده", "خط‌چین: مبلغی که برای سهام موجود در آن روز پرداخت کرده‌اید (با کارمزد). اگر خط ارزش بالای آن باشد، در سود هستید."],
+  perfPf: ["بازدهی", "سود یا زیان دوره تقسیم بر میانگین پولِ سرمایه‌گذاری‌شده در دوره. واریز پول سود حساب نمی‌شود."],
+  pnl: ["سود / زیان", "آنچه در این دوره سود یا زیان کرده‌اید: محقق‌شده (سهام فروخته‌شده) + باز (سهام موجود)."],
   news: ["اخبار +۳ / −۱", "تعداد اخبار اخیر مثبت / منفی دربارهٔ شرکت."],
 };
 for (const [k, v] of Object.entries(FA)) TERMS[k].fa = v;

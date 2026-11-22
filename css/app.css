@@ -226,3 +226,11 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 .course p { margin: 0 0 6px; }
 .share-text { white-space: pre-line; user-select: text; -webkit-user-select: text; font-size: 14px; background: var(--bg); border-radius: 10px; padding: 10px; overflow-wrap: anywhere; }
 #term-dlg .actions { flex-wrap: wrap; }
+/* évolution du portefeuille */
+.pf { margin: 4px 0 8px; }
+.pf-title { margin-bottom: 6px; font-size: 15px; }
+.pf .chart-area, .pf .chart { height: 150px; }
+.chart .inv { stroke: var(--muted); stroke-dasharray: 4 3; }
+.legend .inv::before { background: var(--muted); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 6px; }
+.grid2 .kpi small { display: block; font-size: 11px; margin-top: 2px; }

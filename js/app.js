@@ -1,5 +1,6 @@
 import { getState, update, onChange, uid, upsertAsset, computePositions, exportJSON, importJSON, purgeCache, DEFAULT_SETTINGS, AI_MODELS, aiMissing } from "./store.js";
-import { searchSymbols, getCandles, getNews, cachedCandles, cachedNews, getFx, cachedFx, dataReady, getSeries, PERIODS } from "./data.js";
+import { searchSymbols, getCandles, getNews, cachedCandles, cachedNews, getFx, cachedFx, dataReady, getSeries, PERIODS, getFxSeries, cachedFxSeries } from "./data.js";
+import { portfolioHistory, summarize } from "./history.js";
 import { advise, ACTIONS } from "./advisor.js";
 import { scoreHeadline } from "./sentiment.js";
 import { sma } from "./indicators.js";
@@ -66,7 +67,7 @@ async function loadAsset(asset, force = false) {
 }
 
 // ---------- calcul du tableau de bord (100 % local) ----------
-let view = { tab: "portfolio", detail: null, chartPeriod: "6M" };
+let view = { tab: "portfolio", detail: null, chartPeriod: "6M", pfPeriod: "1M" };
 let busy = false;
 
 function compute() {
@@ -168,7 +169,7 @@ function render() {
       ${data.missingFx ? " · " + t("fxMissing") : ""}</div>`;
   $("#refresh").disabled = busy;
 
-  if (view.tab === "portfolio") app.innerHTML = renderPortfolio(data);
+  if (view.tab === "portfolio") { app.innerHTML = renderPortfolio(data); drawPortfolio(); }
   else if (view.tab === "signals") app.innerHTML = renderSignals(data);
   else if (view.tab === "news") app.innerHTML = renderNews(data);
   else if (view.tab === "guide") app.innerHTML = renderGuide();
@@ -245,7 +246,7 @@ function renderPortfolio({ rows }) {
       ${r.a.urgent ? `<div class="alert">${r.a.alerts.map(esc).join(" · ")}</div>` : ""}
     </li>`;
   }).join("");
-  return `${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
+  return `${getState().transactions.length ? pfShell() : ""}${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
     ${watched.length ? `<h3>${t("watchlist")}</h3><ul class="list">${watchHtml}</ul>` : ""}`;
 }
 
@@ -403,12 +404,114 @@ function aiUsageSafe() {
 
 // ---------- courbe interactive ----------
 const PERIOD_LABEL = {
-  fr: { "1D": "1J", "1W": "1S", "1M": "1M", "6M": "6M", "1Y": "1A", "5Y": "5A", ALL: "Tout" },
-  en: { "1D": "1D", "1W": "1W", "1M": "1M", "6M": "6M", "1Y": "1Y", "5Y": "5Y", ALL: "All" },
-  fa: { "1D": "۱ روز", "1W": "۱ هفته", "1M": "۱ ماه", "6M": "۶ ماه", "1Y": "۱ سال", "5Y": "۵ سال", ALL: "همه" },
+  fr: { "1D": "1J", "1W": "1S", "1M": "1M", "6M": "6M", "1Y": "1A", "2Y": "2A", "5Y": "5A", ALL: "Tout" },
+  en: { "1D": "1D", "1W": "1W", "1M": "1M", "6M": "6M", "1Y": "1Y", "2Y": "2Y", "5Y": "5Y", ALL: "All" },
+  fa: { "1D": "۱ روز", "1W": "۱ هفته", "1M": "۱ ماه", "6M": "۶ ماه", "1Y": "۱ سال", "2Y": "۲ سال", "5Y": "۵ سال", ALL: "همه" },
 };
 const periodLabel = (p) => (PERIOD_LABEL[getState().settings.lang] || PERIOD_LABEL.fr)[p];
 let chartToken = 0;
+
+// ---------- évolution du portefeuille (toutes les actions) ----------
+const PF_DAYS = { "1W": 6, "1M": 22, "6M": 127, "1Y": 253, "2Y": 100000 };
+const pfTried = new Set();
+let pfLoading = false;
+function pfShell() {
+  return `<section class="chart-box pf" id="pf-box">
+    <div class="pf-title"><b>${t("pfTitle")}</b></div>
+    <div class="periods">${Object.keys(PF_DAYS).map((p) => `<button type="button" class="period ${p === view.pfPeriod ? "active" : ""}" data-pfperiod="${p}">${esc(periodLabel(p))}</button>`).join("")}</div>
+    <div class="chart-head"><b id="pf-val"></b> <span id="pf-chg"></span> <span class="muted small" id="pf-date"></span></div>
+    <div id="pf-area" class="chart-area"><div class="chart-msg muted">${t("loading")}</div></div>
+    <div class="legend small"><span class="l price">${term("posValue", t("posValue"))}</span><span class="l inv">${term("invested", t("invested"))}</span></div>
+    <div class="grid2" id="pf-kpis"></div>
+  </section>`;
+}
+// taux de change du jour d (ou du dernier jour connu avant)
+const fxIdx = {};
+function fxRateAt(cur, d) {
+  const base = getState().settings.baseCurrency;
+  if (!cur || cur === base) return 1;
+  const ser = cachedFxSeries(cur, base);
+  if (!ser) return cachedFx(cur, base);
+  const k = cur + base;
+  if (!fxIdx[k] || fxIdx[k].ser !== ser) fxIdx[k] = { ser, keys: Object.keys(ser).sort() };
+  const keys = fxIdx[k].keys;
+  let lo = 0, hi = keys.length - 1, best = null;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (keys[m] <= d) { best = keys[m]; lo = m + 1; } else hi = m - 1; }
+  return ser[best ?? keys[0]];
+}
+async function loadPortfolioHistory(ids, currencies) {
+  if (pfLoading || !dataReady()) return;
+  pfLoading = true;
+  const base = getState().settings.baseCurrency;
+  try {
+    await Promise.all([
+      ...currencies.map((c) => getFxSeries(c, base).catch(() => null)),
+      ...ids.map((id) => getCandles(getState().assets[id]).catch(() => null)),
+    ]);
+  } finally {
+    pfLoading = false;
+    if (view.tab === "portfolio") render();
+  }
+}
+function drawPortfolio() {
+  const box = $("#pf-box");
+  if (!box) return;
+  const s = getState(), base = s.settings.baseCurrency;
+  const ids = [...new Set(s.transactions.map((x) => x.assetId))].filter((id) => s.assets[id]);
+  const candlesById = {};
+  const missing = [];
+  for (const id of ids) {
+    const c = cachedCandles(s.assets[id]);
+    if (c?.length) candlesById[id] = c;
+    else if (!pfTried.has(id)) { pfTried.add(id); missing.push(id); }
+  }
+  const curs = [...new Set(ids.map((id) => s.assets[id].currency).filter((c) => c && c !== base))];
+  const missingFx = curs.filter((c) => !cachedFxSeries(c, base) && !pfTried.has("fx:" + c));
+  missingFx.forEach((c) => pfTried.add("fx:" + c));
+  if (missing.length || missingFx.length) loadPortfolioHistory(missing, missingFx);
+
+  const all = portfolioHistory({ transactions: s.transactions, assets: s.assets, candlesById, fxRate: fxRateAt });
+  const pts = all.slice(-(PF_DAYS[view.pfPeriod] || 22));
+  const area = $("#pf-area");
+  if (pts.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t(pfLoading ? "loading" : "pricesNotLoaded")}</div>`; return; }
+  const sum = summarize(pts);
+  const W = 340, H = 150, n = pts.length;
+  const vals = pts.flatMap((p) => [p.value, p.cost]);
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const X = (i) => (i / (n - 1)) * W, Y = (v) => H - 6 - ((v - min) / span) * (H - 12);
+  const line = (key) => pts.map((p, i) => `${X(i).toFixed(1)},${Y(p[key]).toFixed(1)}`).join(" ");
+  const up = sum.pnl >= 0;
+  const fill = `M0,${H} ` + pts.map((p, i) => `L${X(i).toFixed(1)},${Y(p.value).toFixed(1)}`).join(" ") + ` L${W},${H} Z`;
+  area.innerHTML = `<svg class="chart ${up ? "up" : "down"}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <path class="fill" d="${fill}"/><polyline class="inv" points="${line("cost")}"/><polyline class="price" points="${line("value")}"/>
+      <line class="cross" id="pf-cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/></svg><div class="cross-dot" id="pf-dot" hidden></div>`;
+  const sign = (v) => (v >= 0 ? "+" : "");
+  const show = (i) => {
+    const p = pts[i], d = p.pnl - pts[0].pnl;
+    $("#pf-val").textContent = money(p.value, base);
+    const c = $("#pf-chg"); c.textContent = `${sign(d)}${money(d, base)}`; c.className = tone(d);
+    $("#pf-date").textContent = new Date(p.date + "T12:00:00").toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
+  };
+  show(n - 1);
+  $("#pf-kpis").innerHTML = `
+    <div class="kpi"><span>${term("perfPf", t("performance"))}</span><b class="${tone(sum.perf)}">${pctTxt(sum.perf)}</b></div>
+    <div class="kpi"><span>${term("pnl", t("pnl"))}</span><b class="${tone(sum.pnl)}">${sign(sum.pnl)}${money(sum.pnl, base)}</b>
+      <small class="muted">${money(sum.realized, base)} ${t("realizedW")} · ${money(sum.unrealized, base)} ${t("unrealizedW")}</small></div>`;
+  const svg = area.querySelector("svg"), cross = $("#pf-cross"), dot = $("#pf-dot");
+  const onMove = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.max(0, Math.min(n - 1, Math.round(((ev.clientX - r.left) / r.width) * (n - 1))));
+    cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("visibility", "visible");
+    dot.style.left = `${(X(i) / W) * 100}%`; dot.style.top = `${(Y(pts[i].value) / H) * 100}%`; dot.hidden = false;
+    show(i);
+  };
+  const onLeave = () => { cross.setAttribute("visibility", "hidden"); dot.hidden = true; show(n - 1); };
+  svg.addEventListener("pointerdown", (ev) => { svg.setPointerCapture?.(ev.pointerId); onMove(ev); });
+  svg.addEventListener("pointermove", onMove);
+  svg.addEventListener("pointerup", onLeave);
+  svg.addEventListener("pointerleave", onLeave);
+  svg.addEventListener("pointercancel", onLeave);
+}
 function clearChartHead() {
   for (const id of ["chart-val", "chart-chg", "chart-date", "chart-legend"]) { const el = $("#" + id); if (el) el.textContent = ""; }
 }
@@ -816,6 +919,8 @@ function openTxForm(asset, type, a = null) {
 
 // ---------- événements globaux ----------
 document.addEventListener("click", (e) => {
+  const pfp = e.target.closest("[data-pfperiod]");
+  if (pfp) { view.pfPeriod = pfp.dataset.pfperiod; document.querySelectorAll("[data-pfperiod]").forEach((b) => b.classList.toggle("active", b === pfp)); drawPortfolio(); return; }
   const tm = e.target.closest("[data-term]");
   if (tm) { e.preventDefault(); e.stopPropagation(); showTerm(tm.dataset.term); return; }
   if (e.target.closest("[data-share-copy]")) {
