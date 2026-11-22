@@ -866,3 +866,8 @@ const s0 = getState();
 if (dataReady() && (!s0.lastRefresh || Date.now() - s0.lastRefresh > s0.settings.priceRefreshMinutes * 60000)) refreshAll(false);
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+
+// pas de zoom (pincement / double-tap) : Safari iOS ignore parfois user-scalable=no
+for (const ev of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => { const now = Date.now(); if (now - lastTouchEnd < 300) e.preventDefault(); lastTouchEnd = now; }, { passive: false });
