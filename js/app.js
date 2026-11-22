@@ -416,7 +416,7 @@ async function drawChart(r) {
       <line class="cross" id="cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/>
     </svg>${Object.entries(txAt).flatMap(([i, list]) => list.map((x) =>
       `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(x.price) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
-  $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${txs.length ? `<span class="l dot buy">${t("buy")}</span><span class="l dot sell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
+  $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${txs.length ? `<span class="l txl buy">${t("buy")}</span><span class="l txl sell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
 
   const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.intraday
     ? { weekday: "short", hour: "2-digit", minute: "2-digit" }

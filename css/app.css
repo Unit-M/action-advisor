@@ -39,7 +39,7 @@
 html, body { margin: 0; background: var(--bg); color: var(--text); touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; }
 body {
   font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  padding: env(safe-area-inset-top) 0 calc(70px + env(safe-area-inset-bottom));
+  padding: 0 0 calc(70px + env(safe-area-inset-bottom));
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
 }
@@ -54,7 +54,7 @@ h4 { margin: 10px 0 4px; font-size: 14px; }
 .bad { color: var(--bad); }
 .warn { color: var(--warn); }
 
-.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 10px 16px 8px; border-bottom: 1px solid var(--line); }
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: calc(env(safe-area-inset-top) + 18px) 16px 8px; border-bottom: 1px solid var(--line); }
 .title { display: flex; justify-content: space-between; align-items: center; }
 .top-actions { display: flex; gap: 8px; }
 button.icon { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 20px; }
@@ -128,7 +128,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .sheet { padding: 0 16px calc(env(safe-area-inset-bottom) + 24px); }
 dialog img, dialog svg, dialog table, dialog pre { max-width: 100%; }
 dialog#add .sheet header { padding-top: 12px; }
-.sheet header { display: flex; gap: 12px; align-items: center; margin: 0 -16px 10px; padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+.sheet header { display: flex; gap: 12px; align-items: center; margin: 0 -16px 10px; padding: calc(env(safe-area-inset-top) + 18px) 16px 10px;
   position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
 .close { background: var(--neutral-bg); border: 0; color: var(--text); width: 40px; height: 40px; border-radius: 50%; font-size: 18px; flex: none; }
 .price-big { font-size: 26px; font-weight: 700; margin: 6px 0; }
@@ -158,9 +158,9 @@ dialog#add .sheet header { padding-top: 12px; }
 .legend { display: flex; flex-wrap: wrap; row-gap: 4px; gap: 4px 14px; white-space: nowrap; margin: 6px 2px; color: var(--muted); }
 .legend .l::before { content: ""; display: inline-block; width: 12px; height: 2px; margin-right: 4px; vertical-align: middle; background: currentColor; }
 .tx-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; border: 1.5px solid var(--card); pointer-events: none; }
-.tx-dot.buy, .legend .dot.buy::before { background: var(--good); }
-.tx-dot.sell, .legend .dot.sell::before { background: var(--bad); }
-.legend .dot::before { width: 8px; height: 8px; border-radius: 50%; }
+.tx-dot.buy, .legend .txl.buy::before { background: var(--good); }
+.tx-dot.sell, .legend .txl.sell::before { background: var(--bad); }
+.legend .txl::before { width: 8px; height: 8px; border-radius: 50%; }
 .legend .price::before { background: var(--text); }
 .legend .m50::before { background: var(--accent); }
 .legend .m200::before { background: var(--warn); }
