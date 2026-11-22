@@ -228,11 +228,12 @@ function renderPortfolio({ rows }) {
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="row2">
         <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}
-          ${val != null ? `<div class="posval"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted small">≈ ${money(val * r.fx, base)}</span>` : ""}
-          <span class="${tone(val - p.cost)} small">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}</div>
+</div>
         ${sparkline(r.candles)}
         <div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div>
       </div>
+      ${val != null ? `<div class="posval"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
+        · <span class="${tone(val - p.cost)}">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}
       ${r.a.urgent ? `<div class="alert">${esc(r.a.reasons[0]?.txt)}${r.a.alerts.map((x) => " · " + esc(x)).join("")}</div>` : ""}
     </li>`;
   }).join("");
