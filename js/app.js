@@ -9,6 +9,8 @@ import { t, LANGS, locale, applyDocumentLang } from "./i18n.js";
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const num = (x, d = 2) => (x == null || !isFinite(x) ? "—" : x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d }));
+// quantités : au plus 2 décimales (1,04 ; 9 ; 11,67)
+const qtyTxt = (x) => (x == null || !isFinite(x) ? "—" : x.toLocaleString(locale(), { maximumFractionDigits: 2 }));
 const money = (x, cur = "EUR") => {
   if (x == null || !isFinite(x)) return "—";
   try { return x.toLocaleString(locale(), { style: "currency", currency: cur || "EUR", maximumFractionDigits: 2 }); } catch { return num(x) + " " + (cur || ""); }
@@ -201,7 +203,7 @@ function renderPortfolio({ rows }) {
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1"><b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="row2">
-        <div><span class="muted">${num(p.qty, 0)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
+        <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
         ${sparkline(r.candles)}
         <div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div>
       </div>
@@ -426,7 +428,7 @@ async function drawChart(r) {
     c.textContent = pctTxt(chg);
     c.className = tone(chg);
     const near = [i, i - 1, i + 1].find((k) => txAt[k]);
-    const txt = near != null ? " · " + txAt[near].map((x) => `${x.type === "BUY" ? t("buy") : t("sell")} ${num(x.qty, x.qty % 1 ? 2 : 0)} × ${money(x.price, cur)}`).join(", ") : "";
+    const txt = near != null ? " · " + txAt[near].map((x) => `${x.type === "BUY" ? t("buy") : t("sell")} ${qtyTxt(x.qty)} × ${money(x.price, cur)}`).join(", ") : "";
     $("#chart-date").textContent = fmtDate(pts[i].t) + txt;
   };
   show(n - 1);
@@ -475,14 +477,14 @@ function openDetail(id, data = compute(), silent = false) {
     </div>`}
     ${r.candles?.length ? chartShell() : ""}
     ${r.position ? `<div class="grid3">
-        <div><span class="muted small">${t("quantity")}</span><b>${num(r.position.qty, 0)}</b></div>
+        <div><span class="muted small">${t("quantity")}</span><b>${qtyTxt(r.position.qty)}</b></div>
         <div><span class="muted small">${t("avgCost")}</span><b>${money(r.position.avgPrice, cur)}</b></div>
         <div><span class="muted small">${t("unrealizedShort")}</span><b class="${tone(ind.price - r.position.avgPrice)}">${pctTxt(ind.price / r.position.avgPrice - 1)}</b></div>
       </div>` : ""}
 
     <section class="advice">
       <h3>${t("adviceRules")}</h3>
-      <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: a.qty }) : ""}</b> — ${t("score")} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
+      <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: qtyTxt(a.qty) }) : ""}</b> — ${t("score")} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
       <div class="grid3">
         <div><span class="muted small">${t("stop")}</span><b>${num(a.levels.stop)}</b></div>
         <div><span class="muted small">${t("target")}</span><b>${num(a.levels.target)}</b></div>
@@ -526,7 +528,7 @@ function openDetail(id, data = compute(), silent = false) {
       <h3>${t("transactions")}</h3>
       <div class="actions"><button class="btn good" data-tx="BUY">${t("buyBtn")}</button><button class="btn bad" data-tx="SELL" ${r.position ? "" : "disabled"}>${t("sellBtn")}</button>
         ${s.watch.includes(id) ? `<button class="btn" id="unwatch">${t("unwatch")}</button>` : r.position ? "" : `<button class="btn" id="watch">${t("watch")}</button>`}</div>
-      <ul class="tx">${tx.map((x) => `<li><span class="${x.type === "BUY" ? "good" : "bad"}">${x.type === "BUY" ? t("buy") : t("sell")}</span> ${x.date} · ${num(x.qty, 0)} × ${money(x.price, cur)}${x.fees ? ` (+${money(x.fees, cur)} ${t("fees")})` : ""}
+      <ul class="tx">${tx.map((x) => `<li><span class="${x.type === "BUY" ? "good" : "bad"}">${x.type === "BUY" ? t("buy") : t("sell")}</span> ${x.date} · ${qtyTxt(x.qty)} × ${money(x.price, cur)}${x.fees ? ` (+${money(x.fees, cur)} ${t("fees")})` : ""}
         <button class="link" data-deltx="${esc(x.id)}">${t("delete")}</button></li>`).join("") || `<li class="muted">${t("none")}</li>`}</ul>
     </section>
   </div>`;
@@ -585,7 +587,7 @@ function openDetail(id, data = compute(), silent = false) {
 function renderAIAsset(x, cur) {
   if (x.error) return `<div class="alert">${esc(x.error)}</div>`;
   return `<div class="ai-box">
-    <p><b>${esc(decLabel(x.decision))}${x.quantite ? " " + t("shares", { n: x.quantite }) : ""}</b> · ${t("confidence", { n: x.confiance })}
+    <p><b>${esc(decLabel(x.decision))}${x.quantite ? " " + t("shares", { n: qtyTxt(+x.quantite) }) : ""}</b> · ${t("confidence", { n: x.confiance })}
       · ${x.accord_avec_regles ? t("agreesRules") : `<b>${t("disagreesRules")}</b>`}</p>
     <p>${esc(x.resume)}</p>
     <div class="grid3">
