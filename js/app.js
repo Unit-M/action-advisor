@@ -175,6 +175,29 @@ function render() {
   if (view.detail && !$("#alert-form")?.dataset.dirty) openDetail(view.detail, data, true);
 }
 
+// ---------- logos d'entreprise ----------
+// Logo par symbole (financialmodelingprep, sans clé). Absent ou trop petit (flou) → logo par défaut : initiale sur rond coloré.
+const LOGO_FAIL_KEY = "aa:logofail";
+let logoFail = new Set();
+try { logoFail = new Set(JSON.parse(localStorage.getItem(LOGO_FAIL_KEY) || "[]")); } catch {}
+function logo(asset, cls = "") {
+  const sym = String(asset?.symbol || "?").toUpperCase();
+  let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const img = logoFail.has(sym) ? "" : `<img class="logo-img" alt="" loading="lazy" data-sym="${esc(sym)}" src="https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png">`;
+  return `<span class="logo ${cls}" style="--h:${h}" aria-hidden="true"><i>${esc(sym.replace(/[^A-Z0-9]/g, "").charAt(0) || "?")}</i>${img}</span>`;
+}
+const markLogoFail = (img) => {
+  img.remove();
+  logoFail.add(img.dataset.sym);
+  try { localStorage.setItem(LOGO_FAIL_KEY, JSON.stringify([...logoFail].slice(-500))); } catch {}
+};
+document.addEventListener("load", (e) => {
+  const img = e.target;
+  if (!img.classList?.contains("logo-img")) return;
+  if (img.naturalWidth < 64) markLogoFail(img); else img.classList.add("ok");
+}, true);
+document.addEventListener("error", (e) => { if (e.target.classList?.contains("logo-img")) markLogoFail(e.target); }, true);
+
 function badge(a) {
   const A = ACTIONS[a.action];
   const q = a.qty ? ` ${qtyTxt(a.qty)}` : "";
@@ -201,7 +224,7 @@ function renderPortfolio({ rows }) {
     const p = r.position, price = r.price;
     const g = price != null ? price / p.avgPrice - 1 : null;
     return `<li class="card" data-open="${esc(r.id)}">
-      <div class="row1"><b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
+      <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="row2">
         <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
         ${sparkline(r.candles)}
@@ -213,7 +236,7 @@ function renderPortfolio({ rows }) {
   const watchHtml = watched.map((r) => {
     const m = r.a.ind?.perf1m;
     return `<li class="card" data-open="${esc(r.id)}">
-      <div class="row1"><b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
+      <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="row2">
         <div class="muted small">${r.candles?.length ? `${t("oneMonth")} : <span class="${tone(m)}">${pctTxt(m)}</span>` : t("pricesNotLoaded")}</div>
         ${sparkline(r.candles)}
@@ -232,7 +255,7 @@ function renderSignals({ rows }) {
     <div id="ai-portfolio-out">${renderAIPortfolio(view.aiPortfolio)}</div>
     <ul class="list">${rows.map((r) => `
       <li class="card" data-open="${esc(r.id)}">
-        <div class="row1"><b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
+        <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
         <div class="row2 small">
           <span>${t("score")} <b class="${tone(r.a.score)}">${r.a.score > 0 ? "+" : ""}${r.a.score}</b></span>
           <span>${t("stop")} ${num(r.a.levels.stop)}</span>
@@ -467,7 +490,7 @@ function openDetail(id, data = compute(), silent = false) {
   const keepChart = silent && oldChart && oldChart.dataset.key === chartKey && $("#chart-val")?.textContent;
   dlg.innerHTML = `<div class="sheet">
     <header><button class="close" data-close aria-label="${t("close")}">✕</button>
-      <div><h2>${esc(r.asset.symbol)} ${badge(a)}</h2><div class="muted small">${esc(r.asset.name)} · ${esc(r.asset.exchange || "")} · ${esc(cur || "")}</div></div></header>
+      ${logo(r.asset, "big")}<div><h2>${esc(r.asset.symbol)} ${badge(a)}</h2><div class="muted small">${esc(r.asset.name)} · ${esc(r.asset.exchange || "")} · ${esc(cur || "")}</div></div></header>
     ${r.candles?.length ? "" : `<div class="alert">
       <b>${t("pricesNotLoadedTitle")}</b><br>
       ${!dataReady()
@@ -672,7 +695,7 @@ function openAdd() {
       res.innerHTML = `<li class="muted">${t("searching")}</li>`;
       try {
         const { items, note } = await searchSymbols(q.value.trim());
-        res.innerHTML = (note ? `<li class="alert">${esc(note)}</li>` : "") + items.map((it, i) => `<li class="card" data-i="${i}"><b>${esc(it.symbol)}</b> <span class="muted">${esc(it.exchange)}${it.currency ? " · " + esc(it.currency) : ""}${it.type && it.type !== "Action" && it.type !== "Common Stock" ? " · " + esc(it.type) : ""}</span><br><span class="small">${esc(it.name)}</span></li>`).join("") || `<li class="muted">${esc(t("noResult", { q: q.value.trim() }))}</li>`;
+        res.innerHTML = (note ? `<li class="alert">${esc(note)}</li>` : "") + items.map((it, i) => `<li class="card" data-i="${i}">${logo(it)}<b>${esc(it.symbol)}</b> <span class="muted">${esc(it.exchange)}${it.currency ? " · " + esc(it.currency) : ""}${it.type && it.type !== "Action" && it.type !== "Common Stock" ? " · " + esc(it.type) : ""}</span><br><span class="small">${esc(it.name)}</span></li>`).join("") || `<li class="muted">${esc(t("noResult", { q: q.value.trim() }))}</li>`;
         res.querySelectorAll("[data-i]").forEach((li) => (li.onclick = () => {
           const it = items[+li.dataset.i];
           const id = upsertAsset(it);
@@ -689,7 +712,7 @@ function openAdd() {
 function chooseAddMode(asset) {
   const dlg = $("#add");
   dlg.innerHTML = `<div class="sheet">
-    <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${esc(asset.symbol)}</h2></header>
+    <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${logo(asset)}${esc(asset.symbol)}</h2></header>
     <p class="muted">${esc(asset.name)}</p>
     <div class="actions"><button class="btn good" id="m-buy">${t("iBought")}</button><button class="btn" id="m-watch">${t("watchOnly")}</button></div>
   </div>`;
