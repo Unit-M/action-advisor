@@ -205,7 +205,7 @@ function badge(a) {
 }
 
 function sparkline(candles, w = 90, h = 30) {
-  if (!candles?.length) return "";
+  if (!candles?.length) return `<span class="spark"></span>`;
   const c = candles.slice(-60).map((x) => x.close);
   const min = Math.min(...c), max = Math.max(...c), span = max - min || 1;
   const pts = c.map((v, i) => `${((i / (c.length - 1)) * w).toFixed(1)},${(h - ((v - min) / span) * h).toFixed(1)}`).join(" ");

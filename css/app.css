@@ -84,6 +84,11 @@ main { padding: 12px 16px; max-width: 720px; margin: 0 auto; overflow-x: hidden;
 .posval b { font-size: 15px; }
 .row2.small { font-size: 13px; justify-content: flex-start; gap: 14px; }
 .end { text-align: end; }
+/* cartes de la liste : 3 colonnes fixes (infos | mini-courbe | cours) pour un alignement identique partout */
+.card > .row2:not(.small) { display: grid; grid-template-columns: minmax(0, 1fr) 90px minmax(84px, auto); gap: 10px; flex-wrap: nowrap; }
+.card > .row2:not(.small) > :first-child { min-width: 0; }
+.card > .row2:not(.small) > .spark { justify-self: center; }
+.card > .row2:not(.small) > .end { white-space: nowrap; }
 .spark.good { color: var(--good); }
 .spark.bad { color: var(--bad); }
 
