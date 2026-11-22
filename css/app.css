@@ -115,7 +115,7 @@ button.link { background: none; border: 0; color: var(--accent); font-size: 13px
 .dot.good { background: var(--good); }
 .dot.bad { background: var(--bad); }
 
-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr);
+nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 nav button { background: none; border: 0; color: var(--muted); font-size: 11px; padding: 8px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 nav button span { font-size: 20px; line-height: 1; }
@@ -206,3 +206,20 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 [dir="rtl"] .news .sym { margin-right: 0; margin-left: 4px; }
 [dir="rtl"] .dot { margin-right: 0; margin-left: 6px; }
 [dir="rtl"] .legend .l::before { margin-right: 0; margin-left: 4px; }
+
+/* termes touchables + guide */
+.term, .legend [data-term] { text-decoration: underline dotted; text-decoration-color: var(--muted); text-underline-offset: 3px; cursor: help; }
+#term-dlg { height: auto; max-width: 420px; width: calc(100% - 32px); border-radius: 16px; margin: auto; inset: 0; background: var(--card); }
+#term-dlg::backdrop { background: rgba(0, 0, 0, .5); }
+.term-box { padding: 18px; }
+.term-box b { font-size: 17px; }
+.term-box p { margin: 8px 0 14px; line-height: 1.5; }
+.term-box .actions { display: flex; gap: 8px; justify-content: flex-end; }
+.gloss { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 14px; }
+.gloss th, .gloss td { text-align: start; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+.gloss th { width: 34%; font-weight: 600; }
+.gloss tr:last-child th, .gloss tr:last-child td { border-bottom: 0; }
+.course { cursor: default; line-height: 1.5; font-size: 15px; }
+.course h4 { margin: 14px 0 4px; font-size: 15px; }
+.course h4:first-child { margin-top: 0; }
+.course p { margin: 0 0 6px; }

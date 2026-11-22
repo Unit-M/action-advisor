@@ -25,6 +25,7 @@ const D = {
   navSignals: ["Signaux", "Signals", "سیگنال‌ها"],
   navNews: ["Actus", "News", "اخبار"],
   navSettings: ["Réglages", "Settings", "تنظیمات"],
+  navGuide: ["Guide", "Guide", "راهنما"],
   refresh: ["Actualiser", "Refresh", "به‌روزرسانی"],
   add: ["Ajouter", "Add", "افزودن"],
   totalValue: ["Valeur totale", "Total value", "ارزش کل"],

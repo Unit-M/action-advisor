@@ -3,7 +3,8 @@ import { searchSymbols, getCandles, getNews, cachedCandles, cachedNews, getFx, c
 import { advise, ACTIONS } from "./advisor.js";
 import { scoreHeadline } from "./sentiment.js";
 import { sma } from "./indicators.js";
-import { t, LANGS, locale, applyDocumentLang } from "./i18n.js";
+import { t, LANGS, locale, applyDocumentLang, lang } from "./i18n.js";
+import { TERMS, SECTIONS, COURSE } from "./guide.js";
 
 // ---------- utilitaires ----------
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -143,7 +144,7 @@ async function refreshAll(force = false) {
 function renderChrome() {
   applyDocumentLang();
   document.title = "Action Advisor";
-  const navs = { portfolio: ["◧", "navPortfolio"], signals: ["⚑", "navSignals"], news: ["☰", "navNews"], settings: ["⚙", "navSettings"] };
+  const navs = { portfolio: ["◧", "navPortfolio"], signals: ["⚑", "navSignals"], news: ["☰", "navNews"], guide: ["?", "navGuide"], settings: ["⚙", "navSettings"] };
   document.querySelectorAll("nav button").forEach((b) => {
     const [icon, key] = navs[b.dataset.tab];
     b.innerHTML = `<span>${icon}</span>${esc(t(key))}`;
@@ -160,9 +161,9 @@ function render() {
   renderChrome();
   const gain = data.totalBase - (s.settings.cash || 0) - data.investedBase;
   $("#summary").innerHTML = `
-    <div class="kpi"><span>${t("totalValue")}</span><b>${money(data.totalBase, s.settings.baseCurrency)}</b></div>
-    <div class="kpi"><span>${t("unrealized")}</span><b class="${tone(gain)}">${money(gain, s.settings.baseCurrency)}</b></div>
-    <div class="kpi"><span>${t("cash")}</span><b>${money(s.settings.cash, s.settings.baseCurrency)}</b></div>
+    <div class="kpi"><span>${term("totalValue", t("totalValue"))}</span><b>${money(data.totalBase, s.settings.baseCurrency)}</b></div>
+    <div class="kpi"><span>${term("unrealized", t("unrealized"))}</span><b class="${tone(gain)}">${money(gain, s.settings.baseCurrency)}</b></div>
+    <div class="kpi"><span>${term("cash", t("cash"))}</span><b>${money(s.settings.cash, s.settings.baseCurrency)}</b></div>
     <div class="status">${busy ? `<span id="progress">${t("updatingShort")}</span>` : s.lastRefresh ? t("refreshedAgo", { ago: ago(s.lastRefresh) }) : t("neverRefreshed")}
       ${data.missingFx ? " · " + t("fxMissing") : ""}</div>`;
   $("#refresh").disabled = busy;
@@ -170,6 +171,7 @@ function render() {
   if (view.tab === "portfolio") app.innerHTML = renderPortfolio(data);
   else if (view.tab === "signals") app.innerHTML = renderSignals(data);
   else if (view.tab === "news") app.innerHTML = renderNews(data);
+  else if (view.tab === "guide") app.innerHTML = renderGuide();
   else if (view.tab === "settings" && !$("#settings")?.dataset.dirty) app.innerHTML = renderSettings();
   // on ne reconstruit pas une fiche dont le formulaire est en cours de saisie
   if (view.detail && !$("#alert-form")?.dataset.dirty) openDetail(view.detail, data, true);
@@ -227,8 +229,8 @@ function renderPortfolio({ rows }) {
     const val = price != null ? p.qty * price : null, base = getState().settings.baseCurrency;
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
-      <div class="info"><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
-      ${val != null ? `<div class="info"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
+      <div class="info"><span class="muted">${qtyTxt(p.qty)} × ${term("avgCost", t("avgCost"))}</span> ${money(p.avgPrice, r.asset.currency)}</div>
+      ${val != null ? `<div class="info"><span class="muted">${term("posValue", t("posValue"))}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
         · <span class="${tone(val - p.cost)}">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}
       <div class="chartrow">${sparkline(r.candles)}<div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div></div>
       ${r.a.urgent ? `<div class="alert">${esc(r.a.reasons[0]?.txt)}${r.a.alerts.map((x) => " · " + esc(x)).join("")}</div>` : ""}
@@ -255,7 +257,7 @@ function renderSignals({ rows }) {
       <li class="card" data-open="${esc(r.id)}">
         <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
         <div class="row2 small">
-          <span>${t("score")} <b class="${tone(r.a.score)}">${r.a.score > 0 ? "+" : ""}${r.a.score}</b></span>
+          <span>${term("score", t("score"))} <b class="${tone(r.a.score)}">${r.a.score > 0 ? "+" : ""}${r.a.score}</b></span>
           <span>${t("stop")} ${num(r.a.levels.stop)}</span>
           <span>${t("target")} ${num(r.a.levels.target)}</span>
           ${r.a.levels.buyZone ? `<span>${t("buyZone")} ${num(r.a.levels.buyZone)}</span>` : ""}
@@ -263,6 +265,30 @@ function renderSignals({ rows }) {
         <div class="muted small">${esc(r.a.reasons[0]?.txt || "")}</div>
       </li>`).join("")}</ul>
     <p class="disclaimer">${t("disclaimer")}</p>`;
+}
+
+// ---------- guide / lexique ----------
+const gl = () => (lang() === "fr" ? "fr" : "en");
+// libellé touchable : affiche la définition du terme
+const term = (key, label) => `<span class="term" data-term="${key}">${label}</span>`;
+function renderGuide() {
+  const L = gl();
+  return `<section class="guide">
+    ${SECTIONS.map((sec) => `<h3>${esc(sec[L])}</h3>
+      <table class="gloss">${sec.keys.map((k) => `<tr><th>${esc(TERMS[k][L][0])}</th><td>${esc(TERMS[k][L][1])}</td></tr>`).join("")}</table>`).join("")}
+    <h3>${L === "fr" ? "Petit cours : comprendre les indicateurs" : "Mini course: understanding the indicators"}</h3>
+    <div class="course card">${COURSE[L]}</div>
+  </section>`;
+}
+function showTerm(key) {
+  const d = TERMS[key];
+  if (!d) return;
+  const [name, def] = d[gl()];
+  let dlg = $("#term-dlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "term-dlg"; document.body.appendChild(dlg); dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); }
+  dlg.innerHTML = `<div class="term-box"><b>${esc(name)}</b><p>${esc(def)}</p>
+    <div class="actions"><button class="btn" data-term-guide>${esc(t("navGuide"))}</button><button class="btn primary" data-term-close>OK</button></div></div>`;
+  if (!dlg.open) dlg.showModal();
 }
 
 function renderNews({ rows }) {
@@ -437,7 +463,7 @@ async function drawChart(r) {
       <line class="cross" id="cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/>
     </svg>${Object.entries(txAt).flatMap(([i, list]) => list.map((x) =>
       `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(closes[+i]) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
-  $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${txs.length ? `<span class="l txl buy">${t("buy")}</span><span class="l txl sell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
+  $("#chart-legend").innerHTML = `<span class="l price" data-term="price">${t("legendPrice")}</span>${txs.length ? `<span class="l txl buy" data-term="buySell">${t("buy")}</span><span class="l txl sell" data-term="buySell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50" data-term="ma50">${t("ma50")}</span><span class="l m200" data-term="ma200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop" data-term="stop">${t("stop")}</span>` : ""}`;
 
   const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.intraday
     ? { weekday: "short", hour: "2-digit", minute: "2-digit" }
@@ -498,18 +524,18 @@ function openDetail(id, data = compute(), silent = false) {
     </div>`}
     ${r.candles?.length ? chartShell() : ""}
     ${r.position ? `<div class="grid3">
-        <div><span class="muted small">${t("quantity")}</span><b>${qtyTxt(r.position.qty)}</b></div>
-        <div><span class="muted small">${t("avgCost")}</span><b>${money(r.position.avgPrice, cur)}</b></div>
-        <div><span class="muted small">${t("unrealizedShort")}</span><b class="${tone(ind.price - r.position.avgPrice)}">${pctTxt(ind.price / r.position.avgPrice - 1)}</b></div>
+        <div><span class="muted small">${term("quantity", t("quantity"))}</span><b>${qtyTxt(r.position.qty)}</b></div>
+        <div><span class="muted small">${term("avgCost", t("avgCost"))}</span><b>${money(r.position.avgPrice, cur)}</b></div>
+        <div><span class="muted small">${term("unrealized", t("unrealizedShort"))}</span><b class="${tone(ind.price - r.position.avgPrice)}">${pctTxt(ind.price / r.position.avgPrice - 1)}</b></div>
       </div>` : ""}
 
     <section class="advice">
       <h3>${t("adviceRules")}</h3>
-      <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: qtyTxt(a.qty) }) : ""}</b> — ${t("score")} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
+      <p><b>${esc(actLabel(a.action))}${a.qty ? " " + t("shares", { n: qtyTxt(a.qty) }) : ""}</b> — ${term("score", t("score"))} ${a.score > 0 ? "+" : ""}${a.score}/100</p>
       <div class="grid3">
-        <div><span class="muted small">${t("stop")}</span><b>${num(a.levels.stop)}</b></div>
-        <div><span class="muted small">${t("target")}</span><b>${num(a.levels.target)}</b></div>
-        <div><span class="muted small">${t("buyZone")}</span><b>${num(a.levels.buyZone)}</b></div>
+        <div><span class="muted small">${term("stop", t("stop"))}</span><b>${num(a.levels.stop)}</b></div>
+        <div><span class="muted small">${term("target", t("target"))}</span><b>${num(a.levels.target)}</b></div>
+        <div><span class="muted small">${term("buyZone", t("buyZone"))}</span><b>${num(a.levels.buyZone)}</b></div>
       </div>
       <ul class="reasons">${a.reasons.map((x) => `<li class="${x.key ? "key" : tone(x.pts)}">${x.pts ? `<b>${x.pts > 0 ? "+" : ""}${x.pts}</b> ` : ""}${esc(x.txt)}</li>`).join("")}</ul>
       ${a.alerts?.length ? `<div class="alert">${a.alerts.map(esc).join("<br>")}</div>` : ""}
@@ -523,11 +549,11 @@ function openDetail(id, data = compute(), silent = false) {
     <section>
       <h3>${t("indicators")}</h3>
       <table class="ind">
-        <tr><td>RSI 14</td><td>${num(ind.rsi14, 0)}</td><td>ATR 14</td><td>${num(ind.atr14)}</td></tr>
-        <tr><td>${t("ma50")}</td><td>${num(ind.sma50)}</td><td>${t("ma200")}</td><td>${num(ind.sma200)}</td></tr>
-        <tr><td>${t("high52")}</td><td>${num(ind.high52)}</td><td>${t("low52")}</td><td>${num(ind.low52)}</td></tr>
-        <tr><td>${t("oneMonth")}</td><td class="${tone(ind.perf1m)}">${pctTxt(ind.perf1m)}</td><td>${t("oneYear")}</td><td class="${tone(ind.perf1y)}">${pctTxt(ind.perf1y)}</td></tr>
-        <tr><td>${t("volatility")}</td><td>${ind.volatility != null ? num(ind.volatility * 100, 0) + " %" : "—"}</td><td>${t("newsShort")}</td><td>${a.sentiment?.count ? `${a.sentiment.pos}+ / ${a.sentiment.neg}−` : "—"}</td></tr>
+        <tr><td>${term("rsi", "RSI 14")}</td><td>${num(ind.rsi14, 0)}</td><td>${term("atr", "ATR 14")}</td><td>${num(ind.atr14)}</td></tr>
+        <tr><td>${term("ma50", t("ma50"))}</td><td>${num(ind.sma50)}</td><td>${term("ma200", t("ma200"))}</td><td>${num(ind.sma200)}</td></tr>
+        <tr><td>${term("high52", t("high52"))}</td><td>${num(ind.high52)}</td><td>${term("low52", t("low52"))}</td><td>${num(ind.low52)}</td></tr>
+        <tr><td>${term("perf", t("oneMonth"))}</td><td class="${tone(ind.perf1m)}">${pctTxt(ind.perf1m)}</td><td>${term("perf", t("oneYear"))}</td><td class="${tone(ind.perf1y)}">${pctTxt(ind.perf1y)}</td></tr>
+        <tr><td>${term("volatility", t("volatility"))}</td><td>${ind.volatility != null ? num(ind.volatility * 100, 0) + " %" : "—"}</td><td>${term("news", t("newsShort"))}</td><td>${a.sentiment?.count ? `${a.sentiment.pos}+ / ${a.sentiment.neg}−` : "—"}</td></tr>
       </table>
     </section>
 
@@ -776,6 +802,10 @@ function openTxForm(asset, type, a = null) {
 
 // ---------- événements globaux ----------
 document.addEventListener("click", (e) => {
+  const tm = e.target.closest("[data-term]");
+  if (tm) { e.preventDefault(); e.stopPropagation(); showTerm(tm.dataset.term); return; }
+  if (e.target.closest("[data-term-close]")) { $("#term-dlg")?.close(); return; }
+  if (e.target.closest("[data-term-guide]")) { $("#term-dlg")?.close(); document.querySelectorAll("dialog[open]").forEach((d) => d.close()); view.tab = "guide"; render(); window.scrollTo(0, 0); return; }
   const el = e.target.closest("[data-tab],[data-open],[data-close],#refresh,#add-btn,#ai-portfolio,#export,#purge,#reset-rules");
   if (!el) return;
   if (el.dataset.tab) { e.preventDefault(); el.closest("dialog")?.close(); view.tab = el.dataset.tab; render(); return; }

@@ -1,5 +1,5 @@
 // Service worker : l'application s'ouvre même hors ligne (avec les dernières données en cache).
-const VERSION = "aa-v17";
+const VERSION = "aa-v18";
 const SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const SHELL = [
   "./js/i18n.js",
   "./js/advisor.js",
   "./js/ai.js",
+  "./js/guide.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/apple-touch-icon.png",
