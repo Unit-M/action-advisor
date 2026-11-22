@@ -80,15 +80,12 @@ main { padding: 12px 16px; max-width: 720px; margin: 0 auto; overflow-x: hidden;
 .row1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .row1 .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .row2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
-.posval { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 14px; }
-.posval b { font-size: 15px; }
 .row2.small { font-size: 13px; justify-content: flex-start; gap: 14px; }
 .end { text-align: end; }
-/* cartes de la liste : 3 colonnes fixes (infos | mini-courbe | cours) pour un alignement identique partout */
-.card > .row2:not(.small) { display: grid; grid-template-columns: minmax(0, 1fr) 90px minmax(84px, auto); gap: 10px; flex-wrap: nowrap; }
-.card > .row2:not(.small) > :first-child { min-width: 0; }
-.card > .row2:not(.small) > .spark { justify-self: center; }
-.card > .row2:not(.small) > .end { white-space: nowrap; }
+/* cartes de la liste : infos en lignes, puis mini-courbe à gauche et cours à droite */
+.card .info { margin-top: 6px; overflow-wrap: anywhere; }
+.chartrow { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.chartrow .end { white-space: nowrap; }
 .spark.good { color: var(--good); }
 .spark.bad { color: var(--bad); }
 

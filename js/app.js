@@ -179,11 +179,12 @@ function render() {
 // Logo par symbole (financialmodelingprep, sans clé). Absent ou trop petit (flou) → logo par défaut : initiale sur rond coloré.
 const LOGO_FAIL_KEY = "aa:logofail";
 let logoFail = new Set();
+const LOGO_BAD = ["WGS"]; // logos connus comme faux ou moches → logo par défaut
 try { logoFail = new Set(JSON.parse(localStorage.getItem(LOGO_FAIL_KEY) || "[]")); } catch {}
 function logo(asset, cls = "") {
   const sym = String(asset?.symbol || "?").toUpperCase();
   let h = 0; for (const ch of sym) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const img = logoFail.has(sym) ? "" : `<img class="logo-img" alt="" loading="lazy" data-sym="${esc(sym)}" src="https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png">`;
+  const img = logoFail.has(sym) || LOGO_BAD.includes(sym) ? "" : `<img class="logo-img" alt="" loading="lazy" data-sym="${esc(sym)}" src="https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png">`;
   return `<span class="logo ${cls}" style="--h:${h}" aria-hidden="true"><i>${esc(sym.replace(/[^A-Z0-9]/g, "").charAt(0) || "?")}</i>${img}</span>`;
 }
 const markLogoFail = (img) => {
@@ -226,14 +227,10 @@ function renderPortfolio({ rows }) {
     const val = price != null ? p.qty * price : null, base = getState().settings.baseCurrency;
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
-      <div class="row2">
-        <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}
-</div>
-        ${sparkline(r.candles)}
-        <div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div>
-      </div>
-      ${val != null ? `<div class="posval"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
+      <div class="info"><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
+      ${val != null ? `<div class="info"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted">(${money(val * r.fx, base)})</span>` : ""}
         · <span class="${tone(val - p.cost)}">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}
+      <div class="chartrow">${sparkline(r.candles)}<div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div></div>
       ${r.a.urgent ? `<div class="alert">${esc(r.a.reasons[0]?.txt)}${r.a.alerts.map((x) => " · " + esc(x)).join("")}</div>` : ""}
     </li>`;
   }).join("");
@@ -241,11 +238,8 @@ function renderPortfolio({ rows }) {
     const m = r.a.ind?.perf1m;
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
-      <div class="row2">
-        <div class="muted small">${r.candles?.length ? `${t("oneMonth")} : <span class="${tone(m)}">${pctTxt(m)}</span>` : t("pricesNotLoaded")}</div>
-        ${sparkline(r.candles)}
-        <div class="end"><b>${money(r.price, r.asset.currency)}</b></div>
-      </div>
+      <div class="info muted small">${r.candles?.length ? `${t("oneMonth")} : <span class="${tone(m)}">${pctTxt(m)}</span>` : t("pricesNotLoaded")}</div>
+      <div class="chartrow">${sparkline(r.candles)}<div class="end"><b>${money(r.price, r.asset.currency)}</b></div></div>
       ${r.a.urgent ? `<div class="alert">${r.a.alerts.map(esc).join(" · ")}</div>` : ""}
     </li>`;
   }).join("");
