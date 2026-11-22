@@ -70,13 +70,37 @@ async function loadAsset(asset, force = false) {
 let view = { tab: "portfolio", detail: null, chartPeriod: "6M", pfPeriod: "1M" };
 let busy = false;
 
+// ---------- comptes (Revolut, PEA…) ----------
+const accounts = () => getState().accounts;
+const accName = (a) => a?.name || t("mainAccount");
+const acctOf = (x) => x.accountId || accounts()[0].id;
+const viewAcc = () => { const v = getState().settings.viewAccount; return v && accounts().some((a) => a.id === v) ? v : "all"; };
+const visibleTx = () => { const v = viewAcc(); return v === "all" ? getState().transactions : getState().transactions.filter((x) => acctOf(x) === v); };
+const viewCash = () => { const v = viewAcc(); return accounts().filter((a) => v === "all" || a.id === v).reduce((n, a) => n + (Number(a.cash) || 0), 0); };
+const syncCash = (s) => { s.settings.cash = Math.round(s.accounts.reduce((n, a) => n + (Number(a.cash) || 0), 0) * 100) / 100; };
+function applyAccFields(s, f) {
+  // le 1er compte garde son id : les anciennes opérations sans compte lui restent rattachées
+  for (const a of s.accounts) {
+    const n = f.get("accname:" + a.id), c = f.get("acccash:" + a.id);
+    if (n != null) a.name = String(n).trim();
+    if (c != null && c !== "") a.cash = Math.max(0, +c || 0);
+  }
+  syncCash(s);
+}
+function accFilter() {
+  if (accounts().length < 2) return "";
+  const v = viewAcc();
+  return `<div class="accfilter">${[{ id: "all", name: t("allAccounts") }, ...accounts()].map((a) =>
+    `<button type="button" class="period ${a.id === v ? "active" : ""}" data-acc="${esc(a.id)}">${esc(a.id === "all" ? a.name : accName(a))}</button>`).join("")}</div>`;
+}
+
 function compute() {
   const s = getState();
   const st = s.settings;
-  const positions = computePositions(s.transactions);
+  const positions = computePositions(visibleTx());
   const ids = new Set([...Object.values(positions).filter((p) => p.qty > 0).map((p) => p.assetId), ...s.watch]);
   const rows = [];
-  let totalBase = st.cash || 0, investedBase = 0, missingFx = false;
+  let totalBase = viewCash(), investedBase = 0, missingFx = false;
 
   for (const id of ids) {
     const asset = s.assets[id];
@@ -99,7 +123,7 @@ function compute() {
       news: cachedNews(r.asset),
       position: r.position,
       portfolioValue: totalBase / r.fx,
-      cash: (st.cash || 0) / r.fx,
+      cash: viewCash() / r.fx,
       settings: st,
       alert: s.alerts[r.id],
     });
@@ -160,11 +184,11 @@ function render() {
   const data = compute();
   const app = $("#app");
   renderChrome();
-  const gain = data.totalBase - (s.settings.cash || 0) - data.investedBase;
-  $("#summary").innerHTML = `
+  const gain = data.totalBase - viewCash() - data.investedBase;
+  $("#summary").innerHTML = `${accFilter()}
     <div class="kpi"><span>${term("totalValue", t("totalValue"))}</span><b>${money(data.totalBase, s.settings.baseCurrency)}</b></div>
     <div class="kpi"><span>${term("unrealized", t("unrealized"))}</span><b class="${tone(gain)}">${money(gain, s.settings.baseCurrency)}</b></div>
-    <div class="kpi"><span>${term("cash", t("cash"))}</span><b>${money(s.settings.cash, s.settings.baseCurrency)}</b></div>
+    <div class="kpi"><span>${term("cash", t("cash"))}</span><b>${money(viewCash(), s.settings.baseCurrency)}</b></div>
     <div class="status">${busy ? `<span id="progress">${t("updatingShort")}</span>` : s.lastRefresh ? t("refreshedAgo", { ago: ago(s.lastRefresh) }) : t("neverRefreshed")}
       ${data.missingFx ? " · " + t("fxMissing") : ""}</div>`;
   $("#refresh").disabled = busy;
@@ -246,7 +270,7 @@ function renderPortfolio({ rows }) {
       ${r.a.urgent ? `<div class="alert">${r.a.alerts.map(esc).join(" · ")}</div>` : ""}
     </li>`;
   }).join("");
-  return `${getState().transactions.length ? pfShell() : ""}${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
+  return `${visibleTx().length ? pfShell() : ""}${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
     ${watched.length ? `<h3>${t("watchlist")}</h3><ul class="list">${watchHtml}</ul>` : ""}`;
 }
 
@@ -318,7 +342,14 @@ function renderSettings() {
     <label>${t("language")}<select name="lang">${LANGS.map((l) => `<option value="${l.id}" ${l.id === (st.lang || "fr") ? "selected" : ""}>${l.label}</option>`).join("")}</select></label>
 
     <h3>${t("money")}</h3>
-    ${field("cash", t("availableCash"), "number", 'step="0.01" min="0"')}
+    <h4>${t("accountsTitle")}</h4>
+    <p class="muted small">${t("accountsHelp")}</p>
+    ${accounts().map((a) => `<div class="accrow">
+      <label>${t("accountName")}<input name="accname:${esc(a.id)}" value="${esc(a.name || "")}" placeholder="${esc(t("mainAccount"))}"></label>
+      <label>${t("availableCash")}<input name="acccash:${esc(a.id)}" type="number" step="0.01" min="0" value="${esc(a.cash ?? 0)}"></label>
+      ${accounts().length > 1 ? `<button type="button" class="btn small" data-delacc="${esc(a.id)}" aria-label="${esc(t("delete"))}">✕</button>` : ""}
+    </div>`).join("")}
+    <button type="button" class="btn" id="add-acc">${t("addAccount")}</button>
     <label>${t("baseCurrency")}<select name="baseCurrency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === st.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
 
     <h3>${t("riskRules")}</h3>
@@ -457,7 +488,8 @@ function drawPortfolio() {
   const box = $("#pf-box");
   if (!box) return;
   const s = getState(), base = s.settings.baseCurrency;
-  const ids = [...new Set(s.transactions.map((x) => x.assetId))].filter((id) => s.assets[id]);
+  const txAll = visibleTx();
+  const ids = [...new Set(txAll.map((x) => x.assetId))].filter((id) => s.assets[id]);
   const candlesById = {};
   const missing = [];
   for (const id of ids) {
@@ -470,7 +502,7 @@ function drawPortfolio() {
   missingFx.forEach((c) => pfTried.add("fx:" + c));
   if (missing.length || missingFx.length) loadPortfolioHistory(missing, missingFx);
 
-  const all = portfolioHistory({ transactions: s.transactions, assets: s.assets, candlesById, fxRate: fxRateAt });
+  const all = portfolioHistory({ transactions: txAll, assets: s.assets, candlesById, fxRate: fxRateAt });
   const pts = all.slice(-(PF_DAYS[view.pfPeriod] || 22));
   const area = $("#pf-area");
   if (pts.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t(pfLoading ? "loading" : "pricesNotLoaded")}</div>`; return; }
@@ -555,7 +587,7 @@ async function drawChart(r) {
   const n = pts.length;
   const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
   const firstDay = dayOf(pts[0].t);
-  const txs = getState().transactions.filter((x) => x.assetId === r.asset.id && x.date >= firstDay);
+  const txs = visibleTx().filter((x) => x.assetId === r.asset.id && x.date >= firstDay);
   const txAt = {};
   for (const x of txs) {
     let i = pts.findIndex((p) => dayOf(p.t) >= x.date);
@@ -622,7 +654,7 @@ function openDetail(id, data = compute(), silent = false) {
   const r = data.rows.find((x) => x.id === id) || { id, asset: s.assets[id], fx: 1, a: advise({ settings: s.settings }), candles: s.assets[id] ? cachedCandles(s.assets[id]) : null };
   if (!r.asset) { view.detail = null; return; }
   const a = r.a, ind = a.ind || {}, cur = r.asset.currency;
-  const tx = s.transactions.filter((x) => x.assetId === id).sort((x, y) => (x.date < y.date ? 1 : -1));
+  const tx = visibleTx().filter((x) => x.assetId === id).sort((x, y) => (x.date < y.date ? 1 : -1));
   const alert = s.alerts[id] || {};
   const news = cachedNews(r.asset).slice(0, 8);
   const dlg = $("#detail");
@@ -777,7 +809,7 @@ async function runAIAsset(r, data, force = false) {
     const news = cachedNews(r.asset).length ? cachedNews(r.asset) : await getNews(r.asset).catch(() => []);
     const res = await ai.adviseAsset({
       asset: r.asset, a: r.a, position: r.position, news,
-      portfolioValue: data.totalBase / r.fx, cash: (s.settings.cash || 0) / r.fx, settings: s.settings, force,
+      portfolioValue: data.totalBase / r.fx, cash: viewCash() / r.fx, settings: s.settings, force,
     });
     (view.aiAsset ||= {})[r.id] = res;
   } catch (e) {
@@ -810,7 +842,7 @@ async function runAIPortfolio() {
     const ai = await loadAI();
     const s = getState();
     const data = compute();
-    view.aiPortfolio = await ai.reviewPortfolio({ rows: data.rows.filter((r) => r.a.ind), portfolioValue: data.totalBase, cash: s.settings.cash || 0, settings: s.settings });
+    view.aiPortfolio = await ai.reviewPortfolio({ rows: data.rows.filter((r) => r.a.ind), portfolioValue: data.totalBase, cash: viewCash(), settings: s.settings });
   } catch (e) {
     view.aiPortfolio = { error: e.message };
   }
@@ -876,7 +908,11 @@ function chooseAddMode(asset) {
 function openTxForm(asset, type, a = null) {
   const dlg = $("#add");
   const last = cachedCandles(asset)?.at(-1)?.close;
-  const pos = computePositions(getState().transactions)[asset.id];
+  const v = viewAcc();
+  const lastTx = [...getState().transactions].reverse().find((x) => x.assetId === asset.id);
+  const defAcc = v !== "all" ? v : lastTx ? acctOf(lastTx) : accounts()[0].id;
+  const txOfAcc = (acc) => getState().transactions.filter((x) => acctOf(x) === acc);
+  const pos = computePositions(txOfAcc(defAcc))[asset.id];
   const suggestedQty = a && ((type === "BUY" && a.action.startsWith("BUY")) || (type === "SELL" && a.action.startsWith("SELL"))) ? a.qty : "";
   dlg.innerHTML = `<div class="sheet">
     <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${type === "BUY" ? t("buy") : t("sell")} ${esc(asset.symbol)}</h2></header>
@@ -885,6 +921,7 @@ function openTxForm(asset, type, a = null) {
       <label>${t("unitPrice", { c: esc(asset.currency || "") })}<input name="price" type="number" step="any" min="0" required value="${last ?? ""}"></label>
       <label>${t("feesLabel")}<input name="fees" type="number" step="any" min="0" value="0"></label>
       <label>${t("date")}<input name="date" type="date" required value="${today()}"></label>
+      ${accounts().length > 1 ? `<label>${t("account")}<select name="account">${accounts().map((a) => `<option value="${esc(a.id)}" ${a.id === defAcc ? "selected" : ""}>${esc(accName(a))}</option>`).join("")}</select></label>` : ""}
       <label class="check"><input name="cash" type="checkbox" checked> ${t("updateCash")}</label>
       <button class="btn primary">${t("save")}</button>
     </form></div>`;
@@ -892,12 +929,13 @@ function openTxForm(asset, type, a = null) {
   $("#tx-form").onsubmit = (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    const tr = { id: uid(), assetId: asset.id, type, qty: +f.get("qty"), price: +f.get("price"), fees: +f.get("fees") || 0, date: f.get("date") };
+    const acc = f.get("account") || defAcc;
+    const tr = { id: uid(), assetId: asset.id, accountId: acc, type, qty: +f.get("qty"), price: +f.get("price"), fees: +f.get("fees") || 0, date: f.get("date") };
     if (!(tr.qty > 0) || !(tr.price > 0)) { toast(t("qtyPriceRequired"), "bad"); return; }
     if (type === "SELL") {
       // quantité détenue à la date de la vente ET aujourd'hui (une vente antidatée ne peut pas vendre des titres achetés après)
-      const all = getState().transactions;
-      const held = Math.min(computePositions(all, tr.date)[asset.id]?.qty || 0, pos?.qty || 0);
+      const all = txOfAcc(acc);
+      const held = Math.min(computePositions(all, tr.date)[asset.id]?.qty || 0, computePositions(all)[asset.id]?.qty || 0);
       if (tr.qty > held + 1e-9) { toast(t("heldOnly", { n: num(held, 0) }), "bad"); return; }
     }
     const fx = cachedFx(asset.currency, getState().settings.baseCurrency) ?? 1;
@@ -905,10 +943,13 @@ function openTxForm(asset, type, a = null) {
       s.transactions.push(tr);
       s.watch = s.watch.filter((x) => x !== asset.id || type === "SELL");
       // ligne entièrement vendue : on continue de la surveiller
-      if (type === "SELL" && pos && pos.qty - tr.qty <= 1e-9 && !s.watch.includes(asset.id)) s.watch.push(asset.id);
+      const left = computePositions(s.transactions)[asset.id]?.qty || 0;
+      if (type === "SELL" && left <= 1e-9 && !s.watch.includes(asset.id)) s.watch.push(asset.id);
       if (f.get("cash")) {
         const amount = (tr.qty * tr.price + (type === "BUY" ? tr.fees : -tr.fees)) * fx;
-        s.settings.cash = Math.max(0, Math.round(((s.settings.cash || 0) + (type === "BUY" ? -amount : amount)) * 100) / 100);
+        const A = s.accounts.find((x) => x.id === acc) || s.accounts[0];
+        A.cash = Math.max(0, Math.round(((Number(A.cash) || 0) + (type === "BUY" ? -amount : amount)) * 100) / 100);
+        syncCash(s);
       }
     });
     dlg.close();
@@ -919,6 +960,26 @@ function openTxForm(asset, type, a = null) {
 
 // ---------- événements globaux ----------
 document.addEventListener("click", (e) => {
+  const accb = e.target.closest("[data-acc]");
+  if (accb) { update((s) => { s.settings.viewAccount = accb.dataset.acc; }); return; }
+  if (e.target.closest("#add-acc")) {
+    const form = $("#settings");
+    const f = form ? new FormData(form) : null;
+    update((s) => { if (f) applyAccFields(s, f); s.accounts.push({ id: uid(), name: "", cash: 0 }); });
+    if (form) delete $("#settings").dataset.dirty;
+    render();
+    return;
+  }
+  const dacc = e.target.closest("[data-delacc]");
+  if (dacc) {
+    const id = dacc.dataset.delacc;
+    if (getState().transactions.some((x) => acctOf(x) === id)) { toast(t("accountHasTx"), "bad"); return; }
+    if (!confirm(t("deleteAccountConfirm"))) return;
+    update((s) => { s.accounts = s.accounts.filter((a) => a.id !== id); syncCash(s); });
+    const form = $("#settings"); if (form) delete form.dataset.dirty;
+    render();
+    return;
+  }
   const pfp = e.target.closest("[data-pfperiod]");
   if (pfp) { view.pfPeriod = pfp.dataset.pfperiod; document.querySelectorAll("[data-pfperiod]").forEach((b) => b.classList.toggle("active", b === pfp)); drawPortfolio(); return; }
   const tm = e.target.closest("[data-term]");
@@ -966,6 +1027,7 @@ document.addEventListener("submit", (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   update((s) => {
+    applyAccFields(s, f);
     for (const [k, v] of f.entries()) {
       if (!(k in DEFAULT_SETTINGS)) continue;
       s.settings[k] = typeof DEFAULT_SETTINGS[k] === "number" ? (v === "" ? DEFAULT_SETTINGS[k] : +v) : String(v).trim();

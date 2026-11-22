@@ -32,7 +32,8 @@ function blank() {
   return {
     settings: { ...DEFAULT_SETTINGS },
     assets: {}, // id -> {id, symbol, mic, name, exchange, currency, country}
-    transactions: [], // {id, assetId, type:'BUY'|'SELL', qty, price, fees, date}
+    transactions: [], // {id, assetId, accountId, type:'BUY'|'SELL', qty, price, fees, date}
+    accounts: [{ id: "main", name: "", cash: 0 }], // comptes (courtiers) : chacun ses liquidités
     watch: [], // ids suivis sans position
     alerts: {}, // id -> {below, above}
     aiUsage: { month: "", input: 0, output: 0, calls: 0 },
@@ -50,10 +51,16 @@ function load() {
     const b = blank();
     const st = { ...b.settings, ...(s.settings || {}) };
     if (!st.proxyUrl) st.proxyUrl = DEFAULT_SETTINGS.proxyUrl; // relais vide enregistré avant sa création
-    return { ...b, ...s, settings: st };
+    return migrate({ ...b, ...s, settings: st });
   } catch {
     return blank();
   }
+}
+
+// anciennes sauvegardes : un seul compte, qui reprend les liquidités globales
+function migrate(s) {
+  if (!Array.isArray(s.accounts) || !s.accounts.length) s.accounts = [{ id: "main", name: "", cash: Number(s.settings?.cash) || 0 }];
+  return s;
 }
 
 export function save() {
@@ -96,7 +103,7 @@ export function importJSON(text) {
   if (!s || typeof s !== "object" || !s.assets || !Array.isArray(s.transactions)) throw new Error("Fichier invalide");
   const b = blank();
   const keys = Object.fromEntries(SECRET_KEYS.map((k) => [k, state.settings[k]]));
-  state = { ...b, ...s, settings: { ...b.settings, ...keys, ...(s.settings || {}) } };
+  state = migrate({ ...b, ...s, settings: { ...b.settings, ...keys, ...(s.settings || {}) } });
   save();
 }
 
