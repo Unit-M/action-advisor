@@ -1,5 +1,5 @@
 // Service worker : l'application s'ouvre même hors ligne (avec les dernières données en cache).
-const VERSION = "aa-v5";
+const VERSION = "aa-v6";
 const SHELL = [
   "./",
   "./index.html",

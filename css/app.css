@@ -154,6 +154,10 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .chart .stop { stroke: var(--bad); stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .legend { display: flex; gap: 14px; margin: 6px 2px; color: var(--muted); }
 .legend .l::before { content: ""; display: inline-block; width: 12px; height: 2px; margin-right: 4px; vertical-align: middle; background: currentColor; }
+.tx-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; border: 1.5px solid var(--card); pointer-events: none; }
+.tx-dot.buy, .legend .dot.buy::before { background: var(--good); }
+.tx-dot.sell, .legend .dot.sell::before { background: var(--bad); }
+.legend .dot::before { width: 8px; height: 8px; border-radius: 50%; }
 .legend .price::before { background: var(--text); }
 .legend .m50::before { background: var(--accent); }
 .legend .m200::before { background: var(--warn); }

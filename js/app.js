@@ -385,9 +385,19 @@ async function drawChart(r) {
     m50 = sma(all, 50).slice(-pts.length);
     m200 = sma(all, 200).slice(-pts.length);
   }
-  const vals = [...closes, ...m50, ...m200, stopLvl].filter((v) => v != null && isFinite(v));
-  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  // achats / ventes de ce titre sur la période affichée
   const n = pts.length;
+  const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+  const firstDay = dayOf(pts[0].t);
+  const txs = getState().transactions.filter((x) => x.assetId === r.asset.id && x.date >= firstDay);
+  const txAt = {};
+  for (const x of txs) {
+    let i = pts.findIndex((p) => dayOf(p.t) >= x.date);
+    if (i < 0) i = n - 1;
+    (txAt[i] ||= []).push(x);
+  }
+  const vals = [...closes, ...m50, ...m200, stopLvl, ...txs.map((x) => x.price)].filter((v) => v != null && isFinite(v));
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
   const X = (i) => (i / (n - 1)) * W;
   const Y = (v) => H - 6 - ((v - min) / span) * (H - 12);
   const line = (arr, cls) => {
@@ -402,8 +412,9 @@ async function drawChart(r) {
       ${stopLvl ? `<line class="stop" x1="0" x2="${W}" y1="${Y(stopLvl).toFixed(1)}" y2="${Y(stopLvl).toFixed(1)}"/>` : ""}
       ${line(m200, "m200")}${line(m50, "m50")}${line(closes, "price")}
       <line class="cross" id="cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/>
-    </svg><div class="cross-dot" id="cross-dot" hidden></div>`;
-  $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
+    </svg>${Object.entries(txAt).flatMap(([i, list]) => list.map((x) =>
+      `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(x.price) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
+  $("#chart-legend").innerHTML = `<span class="l price">${t("legendPrice")}</span>${txs.length ? `<span class="l dot buy">${t("buy")}</span><span class="l dot sell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50">${t("ma50")}</span><span class="l m200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop">${t("stop")}</span>` : ""}`;
 
   const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.intraday
     ? { weekday: "short", hour: "2-digit", minute: "2-digit" }
@@ -414,7 +425,9 @@ async function drawChart(r) {
     const c = $("#chart-chg");
     c.textContent = pctTxt(chg);
     c.className = tone(chg);
-    $("#chart-date").textContent = fmtDate(pts[i].t);
+    const near = [i, i - 1, i + 1].find((k) => txAt[k]);
+    const txt = near != null ? " · " + txAt[near].map((x) => `${x.type === "BUY" ? t("buy") : t("sell")} ${num(x.qty, x.qty % 1 ? 2 : 0)} × ${money(x.price, cur)}`).join(", ") : "";
+    $("#chart-date").textContent = fmtDate(pts[i].t) + txt;
   };
   show(n - 1);
 
