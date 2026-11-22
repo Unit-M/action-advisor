@@ -223,10 +223,13 @@ function renderPortfolio({ rows }) {
   const heldHtml = held.map((r) => {
     const p = r.position, price = r.price;
     const g = price != null ? price / p.avgPrice - 1 : null;
+    const val = price != null ? p.qty * price : null, base = getState().settings.baseCurrency;
     return `<li class="card" data-open="${esc(r.id)}">
       <div class="row1">${logo(r.asset)}<b>${esc(r.asset.symbol)}</b><span class="muted name">${esc(r.asset.name)}</span>${badge(r.a)}</div>
       <div class="row2">
-        <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}</div>
+        <div><span class="muted">${qtyTxt(p.qty)} × ${t("avgCost")}</span> ${money(p.avgPrice, r.asset.currency)}
+          ${val != null ? `<div class="posval"><span class="muted">${t("posValue")}</span> <b>${money(val, r.asset.currency)}</b>${base !== r.asset.currency ? ` <span class="muted small">≈ ${money(val * r.fx, base)}</span>` : ""}
+          <span class="${tone(val - p.cost)} small">${val - p.cost >= 0 ? "+" : ""}${money(val - p.cost, r.asset.currency)}</span></div>` : ""}</div>
         ${sparkline(r.candles)}
         <div class="end"><b>${money(price, r.asset.currency)}</b><br><span class="${tone(g)}">${pctTxt(g)}</span></div>
       </div>

@@ -43,6 +43,7 @@ const D = {
   tapPlus: ["Appuyez sur <b>+</b> pour ajouter un achat ou une action à surveiller.", "Tap <b>+</b> to add a purchase or a stock to watch.", "برای افزودن خرید یا سهمی برای دیده‌بانی، <b>+</b> را بزنید."],
   startSettings: ["Commencez par configurer la source des cours dans <a href=\"#\" data-tab=\"settings\">Réglages</a>.", "Start by setting up the price source in <a href=\"#\" data-tab=\"settings\">Settings</a>.", "ابتدا منبع قیمت‌ها را در <a href=\"#\" data-tab=\"settings\">تنظیمات</a> مشخص کنید."],
   avgCost: ["PRU", "Avg cost", "میانگین خرید"],
+  posValue: ["Valeur", "Value", "ارزش"],
   oneMonth: ["1 mois", "1 month", "۱ ماه"],
   oneYear: ["1 an", "1 year", "۱ سال"],
   pricesNotLoaded: ["Cours pas encore chargés", "Prices not loaded yet", "قیمت‌ها هنوز بارگذاری نشده"],
