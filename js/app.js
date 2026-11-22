@@ -268,7 +268,7 @@ function renderSignals({ rows }) {
 }
 
 // ---------- guide / lexique ----------
-const gl = () => (lang() === "fr" ? "fr" : "en");
+const gl = () => (["fr", "en", "fa"].includes(lang()) ? lang() : "en");
 // libellé touchable : affiche la définition du terme
 const term = (key, label) => `<span class="term" data-term="${key}">${label}</span>`;
 function renderGuide() {
@@ -276,7 +276,7 @@ function renderGuide() {
   return `<section class="guide">
     ${SECTIONS.map((sec) => `<h3>${esc(sec[L])}</h3>
       <table class="gloss">${sec.keys.map((k) => `<tr><th>${esc(TERMS[k][L][0])}</th><td>${esc(TERMS[k][L][1])}</td></tr>`).join("")}</table>`).join("")}
-    <h3>${L === "fr" ? "Petit cours : comprendre les indicateurs" : "Mini course: understanding the indicators"}</h3>
+    <h3>${{ fr: "Petit cours : comprendre les indicateurs", en: "Mini course: understanding the indicators", fa: "درس کوتاه: آشنایی با شاخص‌ها" }[L]}</h3>
     <div class="course card">${COURSE[L]}</div>
   </section>`;
 }
