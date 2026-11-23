@@ -931,7 +931,7 @@ function openFlows(accId) {
     <form id="flow-form" class="settings">
       <label>${t("flowType")}<select name="kind"><option value="DEP">${t("flowDep")}</option><option value="WD">${t("flowWd")}</option><option value="DIV">${t("flowDiv")}</option></select></label>
       <label>${t("flowAmount")}<input name="amount" type="number" step="0.01" min="0" required></label>
-      <label>${t("baseCurrency")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+      <label>${t("currencyL")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
       <label>${t("date")}<input name="date" type="date" required value="${today()}"></label>
       <button class="btn primary">${t("save")}</button>
     </form>
@@ -965,7 +965,7 @@ function openManualForm() {
       <label>${t("manualBuyDate")}<input name="buyDate" type="date" required value="${today()}"></label>
       <label>${t("manualValue")}<input name="value" type="number" step="any" min="0" required></label>
       <label>${t("manualValueDate")}<input name="valueDate" type="date" required value="${today()}"></label>
-      <label>${t("baseCurrency")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+      <label>${t("currencyL")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
       ${accounts().length > 1 ? `<label>${t("account")}<select name="account">${accounts().map((a) => `<option value="${esc(a.id)}" ${a.id === v ? "selected" : ""}>${esc(accName(a))}</option>`).join("")}</select></label>` : ""}
       <button class="btn primary">${t("save")}</button>
     </form></div>`;

@@ -26,6 +26,7 @@ const D = {
   navNews: ["Actus", "News", "اخبار"],
   navSettings: ["Réglages", "Settings", "تنظیمات"],
   navGuide: ["Guide", "Guide", "راهنما"],
+  currencyL: ["Devise", "Currency", "ارز"],
   allocTitle: ["Répartition", "Allocation", "ترکیب سبد"],
   flowsBtn: ["Versements ({n})", "Deposits ({n})", "واریزها ({n})"],
   flowsTitle: ["Versements et retraits", "Deposits and withdrawals", "واریز و برداشت"],
