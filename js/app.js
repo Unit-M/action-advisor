@@ -463,7 +463,7 @@ const periodLabel = (p) => (PERIOD_LABEL[getState().settings.lang] || PERIOD_LAB
 let chartToken = 0;
 
 // ---------- évolution du portefeuille (toutes les actions) ----------
-const PF_DAYS = { "1W": 6, "1M": 22, "6M": 127, "1Y": 253, "2Y": 505, ALL: Infinity };
+const PF_DAYS = { "1D": 1, "1W": 6, "1M": 22, "6M": 127, "1Y": 253, "2Y": 505, ALL: Infinity };
 const pfTried = new Set();
 let pfLoading = false;
 function pfShell() {
@@ -560,26 +560,66 @@ function drawPortfolio() {
   if (missing.length || missingFx.length || weeklyMissing.length) loadPortfolioHistory(missing, missingFx, weeklyMissing);
 
   const all = portfolioHistory({ transactions: txAll, assets: s.assets, candlesById, fxRate: fxRateAt, cashFlows: flows, tracked, acctOf });
-  const pts = all.slice(-(PF_DAYS[view.pfPeriod] || 22));
+  if (view.pfPeriod === "1D") { drawPortfolio1D(all); return; }
+  plotPortfolio(all.slice(-(PF_DAYS[view.pfPeriod] || 22)));
+}
+
+// 1 jour : valeur minute par minute (actions en direct, le reste — espèces, placements manuels — constant)
+let pf1dToken = 0;
+async function drawPortfolio1D(all) {
+  const my = ++pf1dToken;
+  const s = getState(), last = all.at(-1);
+  const area = $("#pf-area");
+  if (!last) { area.innerHTML = `<div class="chart-msg muted">${t("pricesNotLoaded")}</div>`; return; }
+  const pos = computePositions(visibleTx());
+  const held = Object.values(pos).filter((p) => p.qty > 0 && s.assets[p.assetId] && !s.assets[p.assetId].manual);
+  const series = await Promise.all(held.map((p) => getSeries(s.assets[p.assetId], "1D").catch(() => null)));
+  if (my !== pf1dToken || !$("#pf-area") || view.pfPeriod !== "1D") return;
+  const lines = held.map((p, k) => {
+    const a = s.assets[p.assetId], sr = series[k];
+    const fx = cachedFx(a.currency, s.settings.baseCurrency) ?? 1;
+    const lastPx = cachedCandles(a)?.at(-1)?.close;
+    return { qty: p.qty, fx, pts: sr?.points || [], start: sr?.base ?? sr?.points?.[0]?.close ?? lastPx, lastPx: sr?.points?.at(-1)?.close ?? lastPx };
+  });
+  const stocksNow = lines.reduce((n, l) => n + (l.lastPx != null ? l.qty * l.lastPx * l.fx : 0), 0);
+  const other = last.value - stocksNow; // espèces + placements manuels : constants sur la journée
+  const times = [...new Set(lines.flatMap((l) => l.pts.map((x) => x.t)))].sort((a, b) => a - b);
+  if (times.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t("pricesNotLoaded")}</div>`; return; }
+  const idx = lines.map(() => 0), cur = lines.map((l) => l.start);
+  const pts = times.map((tm) => {
+    let v = other;
+    lines.forEach((l, k) => {
+      while (idx[k] < l.pts.length && l.pts[idx[k]].t <= tm) cur[k] = l.pts[idx[k]++].close;
+      if (cur[k] != null) v += l.qty * cur[k] * l.fx;
+    });
+    return { t: tm, value: v, cost: last.cost, pnl: v - last.cost, realized: 0,
+      label: new Date(tm).toLocaleString(locale(), { weekday: "short", hour: "2-digit", minute: "2-digit" }) };
+  });
+  plotPortfolio(pts);
+}
+
+function plotPortfolio(pts) {
+  const base = getState().settings.baseCurrency;
   const area = $("#pf-area");
   if (pts.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t(pfLoading ? "loading" : "pricesNotLoaded")}</div>`; return; }
   const sum = summarize(pts);
   const W = 340, H = 150, n = pts.length;
-  const vals = pts.flatMap((p) => [p.value, p.cost]);
+  const intraday = !!pts[0].label; // 1 jour : la ligne « investi » écraserait la courbe
+  const vals = pts.flatMap((p) => (intraday ? [p.value] : [p.value, p.cost]));
   const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
   const X = (i) => (i / (n - 1)) * W, Y = (v) => H - 6 - ((v - min) / span) * (H - 12);
   const line = (key) => pts.map((p, i) => `${X(i).toFixed(1)},${Y(p[key]).toFixed(1)}`).join(" ");
   const up = sum.pnl >= 0;
   const fill = `M0,${H} ` + pts.map((p, i) => `L${X(i).toFixed(1)},${Y(p.value).toFixed(1)}`).join(" ") + ` L${W},${H} Z`;
   area.innerHTML = `<svg class="chart ${up ? "up" : "down"}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <path class="fill" d="${fill}"/><polyline class="inv" points="${line("cost")}"/><polyline class="price" points="${line("value")}"/>
+      <path class="fill" d="${fill}"/>${intraday ? "" : `<polyline class="inv" points="${line("cost")}"/>`}<polyline class="price" points="${line("value")}"/>
       <line class="cross" id="pf-cross" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/></svg><div class="cross-dot" id="pf-dot" hidden></div>`;
   const sign = (v) => (v >= 0 ? "+" : "");
   const show = (i) => {
     const p = pts[i], d = p.pnl - pts[0].pnl;
     $("#pf-val").textContent = money(p.value, base);
     const c = $("#pf-chg"); c.textContent = `${sign(d)}${money(d, base)}`; c.className = tone(d);
-    $("#pf-date").textContent = new Date(p.date + "T12:00:00").toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
+    $("#pf-date").textContent = p.label || new Date(p.date + "T12:00:00").toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
   };
   show(n - 1);
   $("#pf-kpis").innerHTML = `
