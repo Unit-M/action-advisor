@@ -34,6 +34,7 @@ function blank() {
     assets: {}, // id -> {id, symbol, mic, name, exchange, currency, country}
     transactions: [], // {id, assetId, accountId, type:'BUY'|'SELL', qty, price, fees, date}
     accounts: [{ id: "main", name: "", cash: 0 }], // comptes (courtiers) : chacun ses liquidités
+    cashFlows: [], // versements / retraits / dividendes par compte : {id, accountId, date, kind:'DEP'|'WD'|'DIV', amount (signé), currency}
     manualPrices: {}, // placements sans cotation (FCPE…) : id -> [{date, close}] saisis à la main
     watch: [], // ids suivis sans position
     alerts: {}, // id -> {below, above}
@@ -62,6 +63,7 @@ function load() {
 function migrate(s) {
   if (!Array.isArray(s.accounts) || !s.accounts.length) s.accounts = [{ id: "main", name: "", cash: Number(s.settings?.cash) || 0 }];
   if (!s.manualPrices || typeof s.manualPrices !== "object") s.manualPrices = {};
+  if (!Array.isArray(s.cashFlows)) s.cashFlows = [];
   return s;
 }
 
@@ -102,6 +104,23 @@ export function exportJSON() {
 }
 export function importJSON(text) {
   const s = JSON.parse(text);
+  // fichier « versements » (ex. extrait d'un relevé) : AJOUTÉ au compte du même nom, sans rien remplacer
+  if (s?.type === "aa-cashflows" && Array.isArray(s.flows)) {
+    const name = String(s.account || "").trim();
+    let acc = state.accounts.find((a) => (a.name || "").toLowerCase() === name.toLowerCase())
+      || (state.accounts.length === 1 ? state.accounts[0] : null);
+    if (!acc) { acc = { id: uid(), name, cash: 0 }; state.accounts.push(acc); }
+    const key = (f) => [f.date, f.kind, f.amount, f.currency].join("|");
+    const have = new Set(state.cashFlows.filter((f) => f.accountId === acc.id).map(key));
+    let n = 0;
+    for (const f of s.flows) {
+      if (!f.date || !isFinite(f.amount) || have.has(key(f))) continue;
+      state.cashFlows.push({ id: uid(), accountId: acc.id, date: f.date, kind: f.kind || (f.amount < 0 ? "WD" : "DEP"), amount: +f.amount, currency: f.currency || state.settings.baseCurrency });
+      n++;
+    }
+    save();
+    return { flows: n, account: acc.name || "" };
+  }
   if (!s || typeof s !== "object" || !s.assets || !Array.isArray(s.transactions)) throw new Error("Fichier invalide");
   const b = blank();
   const keys = Object.fromEntries(SECRET_KEYS.map((k) => [k, state.settings[k]]));

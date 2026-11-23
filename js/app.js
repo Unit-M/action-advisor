@@ -1,5 +1,5 @@
 import { getState, update, onChange, uid, upsertAsset, computePositions, exportJSON, importJSON, purgeCache, DEFAULT_SETTINGS, AI_MODELS, aiMissing } from "./store.js";
-import { searchSymbols, getCandles, getNews, cachedCandles, cachedNews, getFx, cachedFx, dataReady, getSeries, PERIODS, getFxSeries, cachedFxSeries } from "./data.js";
+import { searchSymbols, getCandles, getNews, cachedCandles, cachedNews, getFx, cachedFx, dataReady, getSeries, PERIODS, getFxSeries, cachedFxSeries, getWeekly, cachedWeekly } from "./data.js";
 import { portfolioHistory, summarize } from "./history.js";
 import { advise, ACTIONS } from "./advisor.js";
 import { scoreHeadline } from "./sentiment.js";
@@ -289,7 +289,7 @@ function renderPortfolio({ rows }) {
       ${r.a.urgent ? `<div class="alert">${r.a.alerts.map(esc).join(" · ")}</div>` : ""}
     </li>`;
   }).join("");
-  return `${visibleTx().length ? pfShell() : ""}${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
+  return `${visibleTx().length ? pfShell() : ""}${allocHtml(held)}${held.length ? `<h3>${t("myPositions")}</h3><ul class="list">${heldHtml}</ul>` : `<p class="muted">${t("noPositionYet")}</p>`}
     ${watched.length ? `<h3>${t("watchlist")}</h3><ul class="list">${watchHtml}</ul>` : ""}`;
 }
 
@@ -366,6 +366,7 @@ function renderSettings() {
     ${accounts().map((a) => `<div class="accrow">
       <label>${t("accountName")}<input name="accname:${esc(a.id)}" value="${esc(a.name || "")}" placeholder="${esc(t("mainAccount"))}"></label>
       <label>${t("availableCash")}<input name="acccash:${esc(a.id)}" type="number" step="0.01" min="0" value="${esc(a.cash ?? 0)}"></label>
+      <button type="button" class="btn small" data-flows="${esc(a.id)}">${t("flowsBtn", { n: (getState().cashFlows || []).filter((f) => f.accountId === a.id).length })}</button>
       ${accounts().length > 1 ? `<button type="button" class="btn small" data-delacc="${esc(a.id)}" aria-label="${esc(t("delete"))}">✕</button>` : ""}
     </div>`).join("")}
     <button type="button" class="btn" id="add-acc">${t("addAccount")}</button>
@@ -462,7 +463,7 @@ const periodLabel = (p) => (PERIOD_LABEL[getState().settings.lang] || PERIOD_LAB
 let chartToken = 0;
 
 // ---------- évolution du portefeuille (toutes les actions) ----------
-const PF_DAYS = { "1W": 6, "1M": 22, "6M": 127, "1Y": 253, "2Y": 100000 };
+const PF_DAYS = { "1W": 6, "1M": 22, "6M": 127, "1Y": 253, "2Y": 505, ALL: Infinity };
 const pfTried = new Set();
 let pfLoading = false;
 function pfShell() {
@@ -473,6 +474,25 @@ function pfShell() {
     <div id="pf-area" class="chart-area"><div class="chart-msg muted">${t("loading")}</div></div>
     <div class="legend small"><span class="l price">${term("posValue", t("posValue"))}</span><span class="l inv">${term("invested", t("invested"))}</span></div>
     <div class="grid2" id="pf-kpis"></div>
+  </section>`;
+}
+// répartition : valeur de chaque ligne (et des liquidités) en % du total
+function allocHtml(held) {
+  const base = getState().settings.baseCurrency;
+  const items = held.filter((r) => r.price != null).map((r) => ({ asset: r.asset, label: r.asset.symbol, v: r.position.qty * r.price * r.fx }));
+  const cash = viewCash();
+  if (cash > 0) items.push({ asset: null, label: t("cash"), v: cash });
+  const total = items.reduce((n, x) => n + x.v, 0);
+  if (items.length < 2 || !(total > 0)) return "";
+  items.sort((a, b) => b.v - a.v);
+  const max = items[0].v;
+  return `<section class="chart-box alloc">
+    <div class="pf-title"><b>${t("allocTitle")}</b> <span class="muted small">${money(total, base)}</span></div>
+    ${items.map((x) => `<div class="arow">
+      ${x.asset ? logo(x.asset) : `<span class="logo" style="--h:140" aria-hidden="true"><i>€</i></span>`}
+      <div class="amain"><div class="atop"><b>${esc(x.label)}</b><span><b>${num((x.v / total) * 100, 1)} %</b> <span class="muted small">${money(x.v, base)}</span></span></div>
+        <div class="abar"><div style="width:${((x.v / max) * 100).toFixed(1)}%"></div></div></div>
+    </div>`).join("")}
   </section>`;
 }
 // taux de change du jour d (ou du dernier jour connu avant)
@@ -489,7 +509,7 @@ function fxRateAt(cur, d) {
   while (lo <= hi) { const m = (lo + hi) >> 1; if (keys[m] <= d) { best = keys[m]; lo = m + 1; } else hi = m - 1; }
   return ser[best ?? keys[0]];
 }
-async function loadPortfolioHistory(ids, currencies) {
+async function loadPortfolioHistory(ids, currencies, weeklyIds = []) {
   if (pfLoading || !dataReady()) return;
   pfLoading = true;
   const base = getState().settings.baseCurrency;
@@ -497,6 +517,7 @@ async function loadPortfolioHistory(ids, currencies) {
     await Promise.all([
       ...currencies.map((c) => getFxSeries(c, base).catch(() => null)),
       ...ids.map((id) => getCandles(getState().assets[id]).catch(() => null)),
+      ...weeklyIds.map((id) => getWeekly(getState().assets[id]).catch(() => null)),
     ]);
   } finally {
     pfLoading = false;
@@ -516,12 +537,29 @@ function drawPortfolio() {
     if (c?.length) candlesById[id] = c;
     else if (!pfTried.has(id)) { pfTried.add(id); missing.push(id); }
   }
-  const curs = [...new Set(ids.map((id) => s.assets[id].currency).filter((c) => c && c !== base))];
+  // versements / retraits des comptes affichés : ces comptes sont « suivis » (valeur = actions + espèces)
+  const v = viewAcc();
+  const flows = (s.cashFlows || []).filter((f) => v === "all" || f.accountId === v);
+  const tracked = new Set(flows.map((f) => f.accountId));
+  // « Tout » : avant les 2 ans de cours journaliers, on complète avec 1 point par semaine
+  const weeklyMissing = [];
+  if (view.pfPeriod === "ALL") {
+    const firstTx = {};
+    for (const x of txAll) if (!firstTx[x.assetId] || x.date < firstTx[x.assetId]) firstTx[x.assetId] = x.date;
+    for (const id of ids) {
+      const c = candlesById[id];
+      if (!c?.length || s.assets[id].manual || firstTx[id] >= c[0].date) continue;
+      const wk = cachedWeekly(s.assets[id]);
+      if (wk?.length) candlesById[id] = [...wk.filter((x) => x.date < c[0].date), ...c];
+      else if (!pfTried.has("wk:" + id)) { pfTried.add("wk:" + id); weeklyMissing.push(id); }
+    }
+  }
+  const curs = [...new Set([...ids.map((id) => s.assets[id].currency), ...flows.map((f) => f.currency)].filter((c) => c && c !== base))];
   const missingFx = curs.filter((c) => !cachedFxSeries(c, base) && !pfTried.has("fx:" + c));
   missingFx.forEach((c) => pfTried.add("fx:" + c));
-  if (missing.length || missingFx.length) loadPortfolioHistory(missing, missingFx);
+  if (missing.length || missingFx.length || weeklyMissing.length) loadPortfolioHistory(missing, missingFx, weeklyMissing);
 
-  const all = portfolioHistory({ transactions: txAll, assets: s.assets, candlesById, fxRate: fxRateAt });
+  const all = portfolioHistory({ transactions: txAll, assets: s.assets, candlesById, fxRate: fxRateAt, cashFlows: flows, tracked, acctOf });
   const pts = all.slice(-(PF_DAYS[view.pfPeriod] || 22));
   const area = $("#pf-area");
   if (pts.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t(pfLoading ? "loading" : "pricesNotLoaded")}</div>`; return; }
@@ -880,6 +918,39 @@ async function runAIPortfolio() {
 }
 
 // ---------- ajout / transaction ----------
+// ---------- versements / retraits d'un compte ----------
+function openFlows(accId) {
+  const dlg = $("#add");
+  const acc = accounts().find((a) => a.id === accId);
+  if (!acc) return;
+  const list = (getState().cashFlows || []).filter((f) => f.accountId === accId).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const kindLabel = { DEP: t("flowDep"), WD: t("flowWd"), DIV: t("flowDiv") };
+  dlg.innerHTML = `<div class="sheet">
+    <header><button class="close" data-close aria-label="${t("close")}">✕</button><h2>${esc(t("flowsTitle"))} · ${esc(accName(acc))}</h2></header>
+    <p class="muted small">${t("flowsHelp")}</p>
+    <form id="flow-form" class="settings">
+      <label>${t("flowType")}<select name="kind"><option value="DEP">${t("flowDep")}</option><option value="WD">${t("flowWd")}</option><option value="DIV">${t("flowDiv")}</option></select></label>
+      <label>${t("flowAmount")}<input name="amount" type="number" step="0.01" min="0" required></label>
+      <label>${t("baseCurrency")}<select name="currency">${["EUR", "USD", "GBP", "CHF"].map((c) => `<option ${c === getState().settings.baseCurrency ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+      <label>${t("date")}<input name="date" type="date" required value="${today()}"></label>
+      <button class="btn primary">${t("save")}</button>
+    </form>
+    <ul class="tx">${list.map((f) => `<li><span class="${f.amount < 0 ? "bad" : "good"}">${esc(kindLabel[f.kind] || f.kind)}</span> ${f.date} · ${money(f.amount, f.currency)}
+      <button class="link" data-delflow="${esc(f.id)}" data-flowacc="${esc(accId)}">${t("delete")}</button></li>`).join("") || `<li class="muted">${t("none")}</li>`}</ul>
+  </div>`;
+  if (!dlg.open) dlg.showModal();
+  $("#flow-form").onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const amt = Math.abs(+f.get("amount"));
+    if (!(amt > 0)) return;
+    const kind = f.get("kind");
+    update((s) => { s.cashFlows.push({ id: uid(), accountId: accId, date: f.get("date"), kind, amount: kind === "WD" ? -amt : amt, currency: f.get("currency") }); });
+    toast(t("txSaved"), "good");
+    openFlows(accId);
+  };
+}
+
 // ---------- placement sans cotation (FCPE, fonds d'épargne salariale…) ----------
 function openManualForm() {
   const dlg = $("#add");
@@ -1030,6 +1101,10 @@ function openTxForm(asset, type, a = null) {
 // ---------- événements globaux ----------
 document.addEventListener("click", (e) => {
   if (e.target.closest("#manual-open")) { openManualForm(); return; }
+  const fl = e.target.closest("[data-flows]");
+  if (fl) { e.preventDefault(); openFlows(fl.dataset.flows); return; }
+  const dfl = e.target.closest("[data-delflow]");
+  if (dfl) { const acc = dfl.dataset.flowacc; update((s) => { s.cashFlows = s.cashFlows.filter((f) => f.id !== dfl.dataset.delflow); }); openFlows(acc); return; }
   const accb = e.target.closest("[data-acc]");
   if (accb) { update((s) => { s.settings.viewAccount = accb.dataset.acc; }); return; }
   if (e.target.closest("#add-acc")) {
@@ -1175,7 +1250,10 @@ document.addEventListener("input", (e) => {
 
 document.addEventListener("change", async (e) => {
   if (e.target.id !== "import" || !e.target.files[0]) return;
-  try { importJSON(await e.target.files[0].text()); toast(t("backupImported"), "good"); } catch (err) { toast(err.message, "bad"); }
+  try {
+    const r = importJSON(await e.target.files[0].text());
+    toast(r?.flows != null ? t("flowsImported", { n: r.flows, a: r.account || t("mainAccount") }) : t("backupImported"), "good");
+  } catch (err) { toast(err.message, "bad"); }
 });
 
 document.querySelectorAll("dialog").forEach((d) => d.addEventListener("close", () => { if (d.id === "detail") { view.detail = null; chartToken++; } }));

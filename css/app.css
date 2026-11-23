@@ -250,3 +250,11 @@ table.ind td:nth-child(odd) { color: var(--muted); }
 .tbar { height: 100%; border-radius: 999px; background: var(--muted); }
 .tbar.good { background: var(--good); } .tbar.wait { background: var(--bad); } .tbar.neutral { background: var(--warn); }
 .tlabel.good { color: var(--good); } .tlabel.wait { color: var(--bad); } .tlabel.neutral { color: var(--warn); }
+/* répartition */
+.alloc .arow { display: flex; gap: 10px; align-items: center; padding: 6px 0; }
+.alloc .amain { flex: 1; min-width: 0; }
+.alloc .atop { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; white-space: nowrap; }
+.alloc .abar { height: 6px; background: var(--neutral-bg); border-radius: 999px; margin-top: 4px; overflow: hidden; }
+.alloc .abar div { height: 100%; background: var(--accent); border-radius: 999px; }
+.accrow { grid-template-columns: 1fr 1fr; }
+.accrow .btn.small { grid-column: auto; }

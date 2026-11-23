@@ -298,6 +298,25 @@ export async function getFx(from, to) {
     return cacheGet(key, null)?.v ?? null;
   }
 }
+// Historique long (1 point par semaine, depuis l'origine) pour la courbe « Tout » du portefeuille
+export async function getWeekly(asset) {
+  if (asset.manual || !proxyBase()) return null;
+  const key = `wk:${asset.id}`;
+  const cached = cacheGet(key, 24 * 3600000);
+  if (cached) return cached.v;
+  try {
+    const j = await yahoo(`/v8/finance/chart/${encodeURIComponent(asset.symbol)}`, { range: "5y", interval: "1wk" });
+    const res = j.chart?.result?.[0];
+    const closes = res?.indicators?.quote?.[0]?.close || [];
+    const pts = (res?.timestamp || []).map((ts, i) => ({ date: new Date(ts * 1000).toISOString().slice(0, 10), close: closes[i] })).filter((x) => x.close != null);
+    cacheSet(key, pts);
+    return pts;
+  } catch {
+    return cacheGet(key, null)?.v ?? null;
+  }
+}
+export const cachedWeekly = (asset) => cacheGet(`wk:${asset.id}`, null)?.v ?? null;
+
 // Taux de change jour par jour sur 2 ans (pour l'historique du portefeuille) : { "AAAA-MM-JJ": taux }
 export async function getFxSeries(from, to) {
   if (!from || !to || from === to || !proxyBase()) return null;
