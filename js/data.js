@@ -384,6 +384,19 @@ export async function getSeries(asset, period) {
       const div = SUB[res?.meta?.currency] || 1;
       points = (res?.timestamp || []).map((ts, i) => ({ t: ts * 1000, close: closes[i] == null ? null : closes[i] / div })).filter((p) => p.close != null);
       if (period === "1D" && res?.meta?.chartPreviousClose) base = res.meta.chartPreviousClose / div; // variation vs clôture de la veille
+      // marché pas encore ouvert aujourd'hui (nuit, week-end) : on montre la DERNIÈRE séance complète
+      if (period === "1D" && points.length < 2) {
+        const j5 = await yahoo(`/v8/finance/chart/${encodeURIComponent(asset.symbol)}`, { range: "5d", interval: "5m" });
+        const r5 = j5.chart?.result?.[0];
+        const c5 = r5?.indicators?.quote?.[0]?.close || [];
+        const off = (r5?.meta?.gmtoffset || 0) * 1000;
+        const all = (r5?.timestamp || []).map((ts, i) => ({ t: ts * 1000, close: c5[i] == null ? null : c5[i] / div })).filter((x) => x.close != null);
+        const dayOf = (x) => new Date(x.t + off).toISOString().slice(0, 10);
+        const lastDay = all.length ? dayOf(all[all.length - 1]) : null;
+        const prev = all.filter((x) => dayOf(x) < lastDay).at(-1);
+        points = all.filter((x) => dayOf(x) === lastDay);
+        base = prev ? prev.close : null;
+      }
     } else {
       const k = settings().twelveDataKey;
       if (!k) throw new Error(t("tdKeyMissing"));
