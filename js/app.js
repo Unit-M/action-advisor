@@ -560,51 +560,63 @@ function drawPortfolio() {
   if (missing.length || missingFx.length || weeklyMissing.length) loadPortfolioHistory(missing, missingFx, weeklyMissing);
 
   const all = portfolioHistory({ transactions: txAll, assets: s.assets, candlesById, fxRate: fxRateAt, cashFlows: flows, tracked, acctOf });
-  if (view.pfPeriod === "1D") { drawPortfolio1D(all); return; }
+  if (["1D", "1W", "1M"].includes(view.pfPeriod)) { drawPortfolioIntra(all, view.pfPeriod); return; }
   plotPortfolio(all.slice(-(PF_DAYS[view.pfPeriod] || 22)));
 }
 
-// 1 jour : valeur minute par minute (actions en direct, le reste — espèces, placements manuels — constant)
-let pf1dToken = 0;
-async function drawPortfolio1D(all) {
-  const my = ++pf1dToken;
-  const s = getState(), last = all.at(-1);
-  const area = $("#pf-area");
-  if (!last) { area.innerHTML = `<div class="chart-msg muted">${t("pricesNotLoaded")}</div>`; return; }
-  const pos = computePositions(visibleTx());
-  const held = Object.values(pos).filter((p) => p.qty > 0 && s.assets[p.assetId] && !s.assets[p.assetId].manual);
-  const series = await Promise.all(held.map((p) => getSeries(s.assets[p.assetId], "1D").catch(() => null)));
-  if (my !== pf1dToken || !$("#pf-area") || view.pfPeriod !== "1D") return;
-  const lines = held.map((p, k) => {
-    const a = s.assets[p.assetId], sr = series[k];
-    const fx = cachedFx(a.currency, s.settings.baseCurrency) ?? 1;
-    const lastPx = cachedCandles(a)?.at(-1)?.close;
-    return { qty: p.qty, fx, pts: sr?.points || [], start: sr?.base ?? sr?.points?.[0]?.close ?? lastPx, lastPx: sr?.points?.at(-1)?.close ?? lastPx };
-  });
-  const stocksNow = lines.reduce((n, l) => n + (l.lastPx != null ? l.qty * l.lastPx * l.fx : 0), 0);
-  const other = last.value - stocksNow; // espèces + placements manuels : constants sur la journée
-  const times = [...new Set(lines.flatMap((l) => l.pts.map((x) => x.t)))].sort((a, b) => a - b);
+// 1J / 1S / 1M : plus de points (5 min, 15 min, 1 h). Positions et espèces de chaque jour reprises de l'historique journalier.
+let pfIntraToken = 0;
+async function drawPortfolioIntra(all, period) {
+  const my = ++pfIntraToken;
+  const s = getState(), area = $("#pf-area");
+  if (!all.length) { area.innerHTML = `<div class="chart-msg muted">${t("pricesNotLoaded")}</div>`; return; }
+  const txs = visibleTx();
+  const ids = [...new Set(txs.map((x) => x.assetId))].filter((id) => s.assets[id] && !s.assets[id].manual);
+  const now = computePositions(txs);
+  const from = all.at(-Math.min(all.length, { "1D": 2, "1W": 7, "1M": 24 }[period]))?.date || "";
+  // titres détenus à un moment de la période
+  const used = ids.filter((id) => now[id]?.qty > 0 || txs.some((x) => x.assetId === id && x.date >= from));
+  const series = await Promise.all(used.map((id) => getSeries(s.assets[id], period).catch(() => null)));
+  if (my !== pfIntraToken || !$("#pf-area") || view.pfPeriod !== period) return;
+  const dOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+  const times = [...new Set(series.flatMap((sr) => (sr?.points || []).map((x) => x.t)))].sort((a, b) => a - b);
   if (times.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t("pricesNotLoaded")}</div>`; return; }
-  const idx = lines.map(() => 0), cur = lines.map((l) => l.start);
+  // par jour : quantités détenues, point de l'historique, clôture journalière de chaque titre
+  const histAt = (d) => { let h = null; for (const p of all) { if (p.date <= d) h = p; else break; } return h || all[0]; };
+  const closeAt = (id, d) => { const c = cachedCandles(s.assets[id]) || []; let v = null; for (const x of c) { if (x.date <= d) v = x.close; else break; } return v; };
+  const dayInfo = {};
+  for (const d of new Set(times.map(dOf))) {
+    const q = computePositions(txs, d), h = histAt(d);
+    let stocks = 0;
+    for (const id of used) {
+      const px = closeAt(id, d), qty = q[id]?.qty || 0;
+      if (qty > 0 && px != null) stocks += qty * px * (fxRateAt(s.assets[id].currency, d) ?? 1);
+    }
+    dayInfo[d] = { q, other: h.value - stocks, cost: h.cost, pnl0: h.pnl - h.value, realized: h.realized };
+  }
+  const idx = used.map(() => 0), cur = used.map((id, k) => series[k]?.base ?? series[k]?.points?.[0]?.close ?? null);
   const pts = times.map((tm) => {
-    let v = other;
-    lines.forEach((l, k) => {
-      while (idx[k] < l.pts.length && l.pts[idx[k]].t <= tm) cur[k] = l.pts[idx[k]++].close;
-      if (cur[k] != null) v += l.qty * cur[k] * l.fx;
+    const d = dOf(tm), info = dayInfo[d];
+    let v = info.other;
+    used.forEach((id, k) => {
+      const ps = series[k]?.points || [];
+      while (idx[k] < ps.length && ps[idx[k]].t <= tm) cur[k] = ps[idx[k]++].close;
+      const qty = info.q[id]?.qty || 0;
+      if (qty > 0 && cur[k] != null) v += qty * cur[k] * (fxRateAt(s.assets[id].currency, d) ?? 1);
     });
-    return { t: tm, value: v, cost: last.cost, pnl: v - last.cost, realized: 0,
-      label: new Date(tm).toLocaleString(locale(), { weekday: "short", hour: "2-digit", minute: "2-digit" }) };
+    return { t: tm, value: v, cost: info.cost, pnl: v + info.pnl0, realized: info.realized,
+      label: new Date(tm).toLocaleString(locale(), period === "1M" ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } : { weekday: "short", hour: "2-digit", minute: "2-digit" }) };
   });
-  plotPortfolio(pts);
+  plotPortfolio(pts, period === "1D");
 }
 
-function plotPortfolio(pts) {
+function plotPortfolio(pts, hideCost = false) {
   const base = getState().settings.baseCurrency;
   const area = $("#pf-area");
   if (pts.length < 2) { area.innerHTML = `<div class="chart-msg muted">${t(pfLoading ? "loading" : "pricesNotLoaded")}</div>`; return; }
   const sum = summarize(pts);
   const W = 340, H = 150, n = pts.length;
-  const intraday = !!pts[0].label; // 1 jour : la ligne « investi » écraserait la courbe
+  const intraday = hideCost; // 1 jour : la ligne « investi » écraserait la courbe
   const vals = pts.flatMap((p) => (intraday ? [p.value] : [p.value, p.cost]));
   const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
   const X = (i) => (i / (n - 1)) * W, Y = (v) => H - 6 - ((v - min) / span) * (H - 12);
@@ -674,11 +686,19 @@ async function drawChart(r) {
   const closes = pts.map((p) => p.close);
   // moyennes mobiles et stop : seulement sur les durées en données journalières
   let m50 = [], m200 = [];
-  const stopLvl = series.daily ? r.a.levels.stop : null;
+  const stopLvl = series.daily || series.hourly ? r.a.levels.stop : null;
   if (series.daily && series.candles?.length) {
     const all = series.candles.map((c) => c.close);
     m50 = sma(all, 50).slice(-pts.length);
     m200 = sma(all, 200).slice(-pts.length);
+  } else if (series.hourly && series.candles?.length) {
+    // points horaires : on reporte la moyenne journalière du jour de chaque point
+    const all = series.candles.map((c) => c.close);
+    const s50 = sma(all, 50), s200 = sma(all, 200), at = {};
+    series.candles.forEach((c, i) => { at[c.date] = [s50[i], s200[i]]; });
+    const dOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+    m50 = pts.map((p) => at[dOf(p.t)]?.[0] ?? null);
+    m200 = pts.map((p) => at[dOf(p.t)]?.[1] ?? null);
   }
   // achats / ventes de ce titre sur la période affichée
   const n = pts.length;
@@ -711,7 +731,9 @@ async function drawChart(r) {
       `<div class="tx-dot ${x.type === "BUY" ? "buy" : "sell"}" style="left:${(X(+i) / W) * 100}%;top:${(Y(closes[+i]) / H) * 100}%"></div>`)).join("")}<div class="cross-dot" id="cross-dot" hidden></div>`;
   $("#chart-legend").innerHTML = `<span class="l price" data-term="price">${t("legendPrice")}</span>${txs.length ? `<span class="l txl buy" data-term="buySell">${t("buy")}</span><span class="l txl sell" data-term="buySell">${t("sell")}</span>` : ""}${m50.some((v) => v != null) ? `<span class="l m50" data-term="ma50">${t("ma50")}</span><span class="l m200" data-term="ma200">${t("ma200")}</span>` : ""}${stopLvl ? `<span class="l stop" data-term="stop">${t("stop")}</span>` : ""}`;
 
-  const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.intraday
+  const fmtDate = (ts) => new Date(ts).toLocaleString(locale(), series.hourly
+    ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }
+    : series.intraday
     ? { weekday: "short", hour: "2-digit", minute: "2-digit" }
     : { day: "numeric", month: "short", year: "numeric" });
   const show = (i) => {

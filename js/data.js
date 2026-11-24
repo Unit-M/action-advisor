@@ -348,11 +348,12 @@ export function cachedFx(from, to) {
 export const PERIODS = ["1D", "1W", "1M", "6M", "1Y", "5Y", "ALL"];
 const SPEC = {
   "1D": { yr: "1d", yi: "5m", ti: "5min", tn: 100, ttl: 5, intraday: true },
-  "1W": { yr: "5d", yi: "30m", ti: "30min", tn: 80, ttl: 30, intraday: true },
+  "1W": { yr: "5d", yi: "15m", ti: "15min", tn: 160, ttl: 15, intraday: true },
+  "1M": { yr: "1mo", yi: "60m", ti: "1h", tn: 180, ttl: 60, intraday: true, hourly: true },
   "5Y": { yr: "5y", yi: "1wk", ti: "1week", tn: 262, ttl: 1440 },
   ALL: { yr: "max", yi: "1mo", ti: "1month", tn: 600, ttl: 1440 },
 };
-const DAILY = { "1M": 22, "6M": 126, "1Y": 252 };
+const DAILY = { "6M": 126, "1Y": 252 };
 
 // Renvoie { points: [{t (ms), close}], intraday, daily } ; daily = true → les moyennes mobiles s'appliquent
 export async function getSeries(asset, period) {
@@ -373,7 +374,8 @@ export async function getSeries(asset, period) {
   const sp = SPEC[period];
   const key = `series:${asset.id}:${period}`;
   const cached = cacheGet(key, sp.ttl * 60000);
-  if (cached) return { points: cached.v.points || cached.v, base: cached.v.base, intraday: !!sp.intraday };
+  const extra = sp.hourly ? { hourly: true, candles: cachedCandles(asset) || [] } : {}; // 1 mois horaire : moyennes mobiles journalières superposées
+  if (cached) return { points: cached.v.points || cached.v, base: cached.v.base, intraday: !!sp.intraday, ...extra };
   let points = [], base = null;
   try {
     if (providerOf(asset) === "yahoo") {
@@ -408,10 +410,10 @@ export async function getSeries(asset, period) {
     }
   } catch (e) {
     const old = cacheGet(key, null);
-    if (old) return { points: old.v.points || old.v, base: old.v.base, intraday: !!sp.intraday, stale: true };
+    if (old) return { points: old.v.points || old.v, base: old.v.base, intraday: !!sp.intraday, stale: true, ...extra };
     throw e;
   }
   if (!points.length) throw new Error(t("noPriceData"));
   cacheSet(key, { points, base });
-  return { points, base, intraday: !!sp.intraday };
+  return { points, base, intraday: !!sp.intraday, ...extra };
 }
