@@ -104,6 +104,8 @@ export function exportJSON() {
 }
 export function importJSON(text) {
   const s = JSON.parse(text);
+  // fichier « aa-import » (rempli par une IA à partir d'un relevé, voir le modèle) : AJOUTÉ aux données existantes
+  if (s?.type === "aa-import") return mergeImport(s);
   // fichier « versements » (ex. extrait d'un relevé) : AJOUTÉ au compte du même nom, sans rien remplacer
   if (s?.type === "aa-cashflows" && Array.isArray(s.flows)) {
     const name = String(s.account || "").trim();
@@ -126,6 +128,51 @@ export function importJSON(text) {
   const keys = Object.fromEntries(SECRET_KEYS.map((k) => [k, state.settings[k]]));
   state = migrate({ ...b, ...s, settings: { ...b.settings, ...keys, ...(s.settings || {}) } });
   save();
+}
+
+function mergeImport(s) {
+  const accByName = (name) => {
+    name = String(name || "").trim();
+    let a = state.accounts.find((x) => (x.name || "").toLowerCase() === name.toLowerCase());
+    if (!a) {
+      const fresh = state.accounts.length === 1 && !state.accounts[0].name && !state.transactions.length;
+      if (fresh) { a = state.accounts[0]; a.name = name; } else { a = { id: uid(), name, cash: 0 }; state.accounts.push(a); }
+    }
+    return a;
+  };
+  for (const a of s.accounts || []) { const acc = accByName(a.name); if (isFinite(a.cash) && a.cash !== "") acc.cash = +a.cash; }
+  const meta = Object.fromEntries((s.assets || []).map((a) => [String(a.symbol || "").toUpperCase(), a]));
+  const ensureAsset = (sym) => {
+    const id = assetId(sym, "");
+    if (!state.assets[id]) {
+      const m = meta[id] || {};
+      state.assets[id] = { id, provider: "yahoo", symbol: sym.toUpperCase(), mic: "", name: m.name || sym.toUpperCase(), exchange: "", currency: m.currency || "",
+        country: /\./.test(sym) ? (/\.PA$/i.test(sym) ? "France" : "") : "United States", type: m.type || "Action" };
+    }
+    return id;
+  };
+  const txKey = (x) => [x.accountId, x.assetId, x.date, x.type, +x.qty, +x.price].join("|");
+  const haveTx = new Set(state.transactions.map((x) => txKey({ ...x, accountId: x.accountId || state.accounts[0].id })));
+  let nTx = 0, nFl = 0;
+  for (const x of s.transactions || []) {
+    if (!x.symbol || !x.date || !(+x.qty > 0) || !(+x.price > 0) || !["BUY", "SELL"].includes(x.type)) continue;
+    const tr = { id: uid(), assetId: ensureAsset(String(x.symbol)), accountId: accByName(x.account).id, type: x.type, qty: +x.qty, price: +x.price, fees: +x.fees || 0, date: x.date };
+    if (haveTx.has(txKey(tr))) continue;
+    haveTx.add(txKey(tr)); state.transactions.push(tr); nTx++;
+  }
+  const flKey = (f) => [f.accountId, f.date, f.kind, f.amount, f.currency].join("|");
+  const haveFl = new Set(state.cashFlows.map(flKey));
+  for (const f of s.cashFlows || []) {
+    if (!f.date || !isFinite(f.amount)) continue;
+    const kind = ["DEP", "WD", "DIV"].includes(f.kind) ? f.kind : (+f.amount < 0 ? "WD" : "DEP");
+    const amount = kind === "WD" ? -Math.abs(+f.amount) : Math.abs(+f.amount);
+    const fl = { id: uid(), accountId: accByName(f.account).id, date: f.date, kind, amount, currency: f.currency || state.settings.baseCurrency };
+    if (haveFl.has(flKey(fl))) continue;
+    haveFl.add(flKey(fl)); state.cashFlows.push(fl); nFl++;
+  }
+  state.settings.cash = Math.round(state.accounts.reduce((n, a) => n + (Number(a.cash) || 0), 0) * 100) / 100;
+  save();
+  return { merged: true, tx: nTx, flows: nFl };
 }
 
 // ---- Cache générique avec durée de vie ----

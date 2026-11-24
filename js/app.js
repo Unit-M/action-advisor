@@ -417,11 +417,13 @@ function renderSettings() {
     <div class="actions">
       <button type="submit" class="btn primary">${t("save")}</button>
       <button type="button" class="btn" id="export">${t("export")}</button>
+      <button type="button" class="btn" id="template">${t("templateBtn")}</button>
       <label class="btn">${t("import")}<input type="file" id="import" accept="application/json" hidden></label>
       <button type="button" class="btn" id="purge">${t("purge")}</button>
       <button type="button" class="btn" id="reset-rules">${t("resetRules")}</button>
     </div>
     <p class="muted small">${t("localData")}</p>
+    <p class="muted small">${t("templateHelp")}</p>
     <h3>${t("shareTitle")}</h3>
     <button type="button" class="btn primary" id="share-app">${t("shareBtn")}</button>
   </form>`;
@@ -1199,7 +1201,7 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#share-app")) { e.preventDefault(); openShare(); return; }
   if (e.target.closest("[data-term-close]")) { $("#term-dlg")?.close(); return; }
   if (e.target.closest("[data-term-guide]")) { $("#term-dlg")?.close(); document.querySelectorAll("dialog[open]").forEach((d) => d.close()); view.tab = "guide"; render(); window.scrollTo(0, 0); return; }
-  const el = e.target.closest("[data-tab],[data-open],[data-close],#refresh,#add-btn,#ai-portfolio,#export,#purge,#reset-rules");
+  const el = e.target.closest("[data-tab],[data-open],[data-close],#refresh,#add-btn,#ai-portfolio,#export,#template,#purge,#reset-rules");
   if (!el) return;
   if (el.dataset.tab) { e.preventDefault(); el.closest("dialog")?.close(); view.tab = el.dataset.tab; render(); return; }
   if (el.dataset.open) { openDetail(el.dataset.open); return; }
@@ -1207,9 +1209,14 @@ document.addEventListener("click", (e) => {
   if (el.id === "refresh") refreshAll(true); // force les cours ; les actus gardent leur cache
   if (el.id === "add-btn") openAdd();
   if (el.id === "ai-portfolio") runAIPortfolio();
-  if (el.id === "export") {
-    const name = `action-advisor-${today()}.json`;
-    const file = new File([exportJSON()], name, { type: "application/json" });
+  if (el.id === "template") shareJSON("action-advisor-modele.json", JSON.stringify(importTemplate(), null, 2));
+  if (el.id === "export") shareJSON(`action-advisor-${today()}.json`, exportJSON());
+});
+
+// partage d'un fichier JSON : menu Partager sur iPhone (Enregistrer dans Fichiers, Messages…), sinon téléchargement
+function shareJSON(name, text) {
+  {
+    const file = new File([text], name, { type: "application/json" });
     // Sur iPhone (app écran d'accueil), le menu Partager permet d'enregistrer dans Fichiers
     if (navigator.canShare?.({ files: [file] })) {
       navigator.share({ files: [file], title: name }).catch(() => {});
@@ -1221,6 +1228,44 @@ document.addEventListener("click", (e) => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
+}
+
+// modèle à donner à une IA (ChatGPT, Claude…) avec un relevé de courtier : elle le remplit, puis Réglages → Importer
+function importTemplate() {
+  return {
+    type: "aa-import",
+    _instructions_pour_IA: [
+      "Remplis ce fichier à partir du relevé de courtier fourni. Réponds UNIQUEMENT avec le JSON complet, valide, sans commentaire.",
+      "Garde exactement les mêmes noms de champs. Supprime les exemples et mets les vraies données.",
+      "accounts : un objet par compte (nom libre, ex. « Revolut », « PEA BoursoBank ») ; cash = espèces non investies à la fin du relevé, dans la devise de base de l'utilisateur.",
+      "assets : symbole au format Yahoo Finance — actions US sans suffixe (AAPL, NVDA) ; Paris .PA (AIR.PA, CW8.PA) ; Xetra .DE ; Amsterdam .AS ; Milan .MI ; Londres .L. currency = devise de cotation (EUR, USD…).",
+      "transactions : type BUY ou SELL ; date AAAA-MM-JJ ; qty = nombre de titres (décimales autorisées) ; price = prix unitaire d'exécution dans la devise du titre ; fees = frais + commissions + taxes de l'opération ; account = nom exact d'un compte ci-dessus.",
+      "Divisions d'actions (split) : ajuste qty et price des opérations ANTÉRIEURES au split (ex. split 10:1 → qty × 10, price ÷ 10) ; regroupement : l'inverse.",
+      "cashFlows : virements vers le compte (kind DEP, montant positif), retraits (kind WD, montant négatif), dividendes / intérêts / bonus (kind DIV, positif) ; currency = devise du mouvement. Ne compte PAS les conversions de devise internes comme des versements.",
+      "Vérification : en rejouant achats et ventes, les quantités finales doivent correspondre aux positions de fin du relevé.",
+    ],
+    _instructions_for_AI: "Fill this file from the attached broker statement. Reply ONLY with the complete valid JSON. Keep field names; replace the examples. Yahoo Finance symbols (US no suffix, Paris .PA, Xetra .DE). type BUY/SELL, dates YYYY-MM-DD, price per share in the asset currency, fees = all costs. cashFlows: DEP (+), WD (−), DIV (+). Adjust pre-split trades. Final quantities must match the statement's closing positions.",
+    accounts: [{ name: "Mon courtier", cash: 0 }],
+    assets: [
+      { symbol: "NVDA", name: "NVIDIA", currency: "USD" },
+      { symbol: "CW8.PA", name: "Amundi MSCI World", currency: "EUR" },
+    ],
+    transactions: [
+      { account: "Mon courtier", symbol: "NVDA", type: "BUY", date: "2025-01-15", qty: 2, price: 135.5, fees: 1 },
+      { account: "Mon courtier", symbol: "CW8.PA", type: "BUY", date: "2025-02-03", qty: 1, price: 540.2, fees: 0 },
+      { account: "Mon courtier", symbol: "NVDA", type: "SELL", date: "2025-06-10", qty: 1, price: 150, fees: 1 },
+    ],
+    cashFlows: [
+      { account: "Mon courtier", date: "2025-01-10", kind: "DEP", amount: 1000, currency: "EUR" },
+      { account: "Mon courtier", date: "2025-03-27", kind: "DIV", amount: 0.31, currency: "USD" },
+      { account: "Mon courtier", date: "2025-07-01", kind: "WD", amount: -200, currency: "EUR" },
+    ],
+  };
+}
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("#purge,#reset-rules");
+  if (!el) return;
   if (el.id === "purge") { purgeCache(); toast(t("cacheCleared")); render(); }
   if (el.id === "reset-rules") {
     const keep = ["lang", "dataProvider", "proxyUrl", "twelveDataKey", "finnhubKey", "anthropicKey", "openaiKey", "openaiModel", "aiProvider", "cash", "baseCurrency", "aiModel", "aiMonthlyTokenBudget"];
@@ -1314,7 +1359,7 @@ document.addEventListener("change", async (e) => {
   if (e.target.id !== "import" || !e.target.files[0]) return;
   try {
     const r = importJSON(await e.target.files[0].text());
-    toast(r?.flows != null ? t("flowsImported", { n: r.flows, a: r.account || t("mainAccount") }) : t("backupImported"), "good");
+    toast(r?.merged ? t("mergedImported", { tx: r.tx, f: r.flows }) : r?.flows != null ? t("flowsImported", { n: r.flows, a: r.account || t("mainAccount") }) : t("backupImported"), "good");
   } catch (err) { toast(err.message, "bad"); }
 });
 
